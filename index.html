@@ -147,17 +147,18 @@
     <div x-show="activeTab === 'ai'" class="space-y-4">
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
         <h2 class="font-bold text-slate-800 text-base flex items-center gap-1.5">
-          📸 AI 拍照/收據自動辨識 (Vision)
+          📸 AI 拍照/相簿收據自動辨識 (Vision)
         </h2>
-        <p class="text-xs text-slate-500">上傳或拍攝單據，AI 自動萃取金額與細節。</p>
+        <p class="text-xs text-slate-500">拍照或上傳相簿收據，AI 自動萃取金額與細節。</p>
         
-        <input type="file" id="receiptInput" accept="image/*" capture="environment" @change="handleReceiptUpload($event)" class="hidden">
+        <!-- 已移除 capture 屬性，開啟標準相簿/相機選擇選單 -->
+        <input type="file" id="receiptInput" accept="image/*" @change="handleReceiptUpload($event)" class="hidden">
         
         <div @click="triggerPhotoScan()" class="border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl p-4 text-center cursor-pointer bg-indigo-50/50 transition">
           <template x-if="!receiptImage">
             <div>
-              <div class="text-3xl mb-1">📷</div>
-              <div class="text-xs font-semibold text-indigo-600">點擊拍攝或選擇收據相片</div>
+              <div class="text-3xl mb-1">🖼️ / 📷</div>
+              <div class="text-xs font-semibold text-indigo-600">點擊選擇相簿照片或拍照</div>
             </div>
           </template>
           <template x-if="receiptImage">
@@ -272,7 +273,7 @@
     </div>
   </div>
 
-  <!-- 彈窗 3：新增/編輯消費 (新增指定金額功能) -->
+  <!-- 彈窗 3：新增/編輯消費 -->
   <div x-show="showExpenseModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b pb-2">
@@ -392,7 +393,6 @@
         toast: { show: false, message: '' },
 
         init() {
-          // 檢查網址是否有分享數據參數
           const urlParams = new URLSearchParams(window.location.search);
           const sharedData = urlParams.get('data');
           if (sharedData) {
@@ -458,7 +458,6 @@
           return Object.values(exp.customShares).some(v => v !== null && v !== '' && !isNaN(v) && Number(v) > 0);
         },
 
-        // --- 同步與備份模組 ---
         openSyncModal() {
           this.importCodeInput = '';
           this.showSyncModal = true;
@@ -503,7 +502,6 @@
           }
         },
 
-        // --- 消費與拆帳計算邏輯 (升級指定金額與剩餘平分) ---
         get memberBalances() {
           const balances = {};
           this.trip.members.forEach(m => balances[m] = 0);
@@ -517,7 +515,6 @@
             let customSum = 0;
             let unassignedCount = 0;
 
-            // 統計有指定金額與沒指定金額的人數
             participants.forEach(p => {
               const val = Number(customShares[p]);
               if (!isNaN(val) && val > 0) {
@@ -527,7 +524,6 @@
               }
             });
 
-            // 計算剩餘未指定金額，平分給未填的人
             const remaining = Math.max(0, exp.amount - customSum);
             const autoShare = unassignedCount > 0 ? remaining / unassignedCount : 0;
 
@@ -590,7 +586,6 @@
           if (!this.formExpense.title.trim() || !this.formExpense.amount || this.formExpense.amount <= 0) return this.showToast('請填寫有效名稱與金額');
           if (this.formExpense.participants.length === 0) return this.showToast('請選擇參與拆帳成員');
 
-          // 清理未選成員的 customShares
           const cleanedShares = {};
           this.formExpense.participants.forEach(p => {
             if (this.formExpense.customShares[p]) {
