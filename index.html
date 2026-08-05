@@ -76,10 +76,10 @@
       });
 
       // Firebase AI Logic：使用 Gemini Developer API。
-     const ai = getAI(firebaseApp, {
-  backend: new GoogleAIBackend(),
-  useLimitedUseAppCheckTokens: true
-}); 
+      const ai = getAI(firebaseApp, {
+        backend: new GoogleAIBackend(),
+        useLimitedUseAppCheckTokens: true
+      });
 
       const auth = getAuth(firebaseApp);
 
@@ -1499,8 +1499,27 @@
           const message = String(error?.message || '').toLowerCase();
           const combined = `${code} ${message}`;
 
-          if (combined.includes('app-check') || combined.includes('appcheck') || combined.includes('403')) {
-            return 'AI 請求被 App Check 拒絕；請確認網域及 Site key 設定後重新整理';
+          if (
+            combined.includes('app-check') ||
+            combined.includes('appcheck') ||
+            combined.includes('attestation') ||
+            combined.includes('reused token')
+          ) {
+            return 'App Check 驗證失敗；請確認 App Check 設定及重播保護';
+          }
+
+          if (
+            combined.includes('firebasevertexai.googleapis.com') &&
+            combined.includes('blocked')
+          ) {
+            return 'Firebase API Key 尚未允許 Firebase AI Logic API';
+          }
+
+          if (
+            combined.includes('permission_denied') ||
+            combined.includes('caller does not have permission')
+          ) {
+            return 'Firebase API Key 與目前 Firebase 專案不一致';
           }
 
           if (combined.includes('429') || combined.includes('quota') || combined.includes('rate')) {
@@ -1515,7 +1534,13 @@
             return '目前無法連接 AI 服務，請檢查網絡';
           }
 
-          return 'AI 處理失敗，請稍後再試';
+          const originalMessage = String(
+            error?.message ||
+            error?.code ||
+            '未知錯誤'
+          );
+
+          return 'AI 處理失敗：' + originalMessage.slice(0, 160);
         },
 
         parseAIJsonResponse(result) {
