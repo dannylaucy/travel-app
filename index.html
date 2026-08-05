@@ -4,10 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>旅遊記帳與拆帳小幫手</title>
-
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-
   <!-- Firebase 初始化完成通知 -->
   <script>
     window.firebaseReadyPromise = new Promise((resolve, reject) => {
@@ -45,6 +43,18 @@
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
 
+    import {
+      initializeAppCheck,
+      ReCaptchaEnterpriseProvider
+    } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app-check.js";
+
+    import {
+      getAI,
+      getGenerativeModel,
+      GoogleAIBackend,
+      Schema
+    } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-ai.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyD5pVMm7T4NNEhAVWexLzt-Tsy6ltsu4oU",
       authDomain: "travel-expense-splitter-6aca5.firebaseapp.com",
@@ -56,15 +66,26 @@
 
     try {
       const firebaseApp = initializeApp(firebaseConfig);
+
+      // App Check 必須先於其他 Firebase 服務初始化。
+      const appCheck = initializeAppCheck(firebaseApp, {
+        provider: new ReCaptchaEnterpriseProvider(
+          "6Lef-3YtAAAAAMIdIR0WMOJb7LmC_FzNw73uSxf-"
+        ),
+        isTokenAutoRefreshEnabled: true
+      });
+
+      // Firebase AI Logic：使用 Gemini Developer API。
+      const ai = getAI(firebaseApp, {
+        backend: new GoogleAIBackend()
+      });
+
       const auth = getAuth(firebaseApp);
 
       try {
         await setPersistence(auth, browserLocalPersistence);
       } catch (authPersistenceError) {
-        console.warn(
-          "登入狀態無法持久保存，仍會繼續啟用 Firebase。",
-          authPersistenceError
-        );
+        console.warn("登入狀態無法持久保存，仍會繼續啟用 Firebase。", authPersistenceError);
       }
 
       let db;
@@ -77,11 +98,7 @@
           })
         });
       } catch (cacheError) {
-        console.warn(
-          "Firestore 持久離線快取無法啟用，改用記憶體快取。",
-          cacheError
-        );
-
+        console.warn("Firestore 持久離線快取無法啟用，改用記憶體快取。", cacheError);
         persistentCacheEnabled = false;
         db = getFirestore(firebaseApp);
       }
@@ -89,7 +106,11 @@
       window.firebaseBridge = {
         auth,
         db,
+        appCheck,
+        ai,
         persistentCacheEnabled,
+        getGenerativeModel,
+        Schema,
         GoogleAuthProvider,
         signInWithPopup,
         signOut,
@@ -102,212 +123,99 @@
         serverTimestamp
       };
 
-      window.__resolveFirebaseReady(
-        window.firebaseBridge
-      );
+      window.__resolveFirebaseReady(window.firebaseBridge);
     } catch (error) {
-      console.error(
-        "Firebase 初始化失敗",
-        error
-      );
-
+      console.error("Firebase 初始化失敗", error);
       window.__rejectFirebaseReady(error);
     }
   </script>
 
   <!-- Alpine.js -->
-  <script
-    defer
-    src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"
-  ></script>
-
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <style>
-    [x-cloak] {
-      display: none !important;
-    }
-
-    body {
-      font-family:
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        Roboto,
-        Helvetica,
-        Arial,
-        sans-serif;
-    }
+    [x-cloak] { display: none !important; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   </style>
 </head>
-
-<body
-  class="bg-slate-50 text-slate-800 min-h-screen pb-12"
-  x-data="expenseApp"
-  x-cloak
->
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-12" x-data="expenseApp" x-cloak>
 
   <!-- 頂部導航列 -->
   <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-30">
-
     <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
-
       <div class="flex items-center space-x-2">
-
-        <svg
-          class="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          ></path>
-        </svg>
-
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
         <div>
-          <h1
-            class="font-bold text-lg leading-tight"
-            x-text="trip.name"
-          ></h1>
-
-          <p
-            class="text-xs text-indigo-200"
-            x-text="'本位幣：' + trip.baseCurrency + ' | 成員 ' + trip.members.length + ' 人'"
-          ></p>
+          <h1 class="font-bold text-lg leading-tight" x-text="trip.name"></h1>
+          <p class="text-xs text-indigo-200" x-text="'本位幣：' + trip.baseCurrency + ' | 成員 ' + trip.members.length + ' 人'"></p>
         </div>
-
       </div>
-
       <div class="flex items-center gap-1.5">
-
-        <button
-          @click="openSyncModal()"
-          class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1"
-        >
+        <button @click="openSyncModal()" class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
           📲 同步/備份
         </button>
-
-        <button
-          @click="openTripSettings()"
-          class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1"
-        >
+        <button @click="openTripSettings()" class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
           ⚙️ 設定
         </button>
-
       </div>
-
     </div>
   </header>
 
   <!-- 雲端備份狀態 -->
   <section class="max-w-md mx-auto px-4 mt-3">
-
     <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-
       <template x-if="!firebaseReady && !firebaseLoadFailed">
-
         <div class="flex items-center justify-between gap-3">
-
           <div>
-            <div class="text-sm font-semibold text-slate-700">
-              ☁️ 雲端備份
-            </div>
-
-            <div class="text-xs text-slate-500 mt-0.5">
-              正在載入 Firebase；本機記帳仍可正常使用。
-            </div>
+            <div class="text-sm font-semibold text-slate-700">☁️ 雲端備份</div>
+            <div class="text-xs text-slate-500 mt-0.5">正在載入 Firebase；本機記帳仍可正常使用。</div>
           </div>
-
-          <div class="text-xs text-slate-400">
-            初始化中
-          </div>
-
+          <div class="text-xs text-slate-400">初始化中</div>
         </div>
-
       </template>
 
       <template x-if="firebaseLoadFailed">
-
         <div>
-          <div class="text-sm font-semibold text-rose-700">
-            ☁️ 雲端功能載入失敗
-          </div>
-
-          <div class="text-xs text-slate-500 mt-0.5">
-            本機記帳仍可使用；請檢查網絡後重新整理頁面。
-          </div>
+          <div class="text-sm font-semibold text-rose-700">☁️ 雲端功能載入失敗</div>
+          <div class="text-xs text-slate-500 mt-0.5">本機記帳仍可使用；請檢查網絡後重新整理頁面。</div>
         </div>
-
       </template>
 
       <template x-if="firebaseReady && !firebaseUser">
-
         <div class="flex items-center justify-between gap-3">
-
           <div class="min-w-0">
-            <div class="text-sm font-semibold text-slate-700">
-              ☁️ 尚未啟用雲端備份
-            </div>
-
-            <div class="text-xs text-amber-600 mt-0.5">
-              目前資料只保存在這部裝置的瀏覽器。
-            </div>
+            <div class="text-sm font-semibold text-slate-700">☁️ 尚未啟用雲端備份</div>
+            <div class="text-xs text-amber-600 mt-0.5">目前資料只保存在這部裝置的瀏覽器。</div>
           </div>
-
           <button
             @click="signInWithGoogle()"
             :disabled="authLoading"
             class="shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
             x-text="authLoading ? '登入中…' : 'Google 登入'"
           ></button>
-
         </div>
-
       </template>
 
       <template x-if="firebaseReady && firebaseUser">
-
         <div class="space-y-2">
-
           <div class="flex items-start justify-between gap-3">
-
             <div class="min-w-0">
-
-              <div
-                class="text-sm font-semibold text-slate-700 truncate"
-                x-text="firebaseUser.email || firebaseUser.displayName || 'Google 使用者'"
-              ></div>
-
+              <div class="text-sm font-semibold text-slate-700 truncate" x-text="firebaseUser.email || firebaseUser.displayName || 'Google 使用者'"></div>
               <div
                 class="text-xs mt-0.5"
                 :class="{
                   'text-emerald-600': syncStatus === '已同步',
-                  'text-amber-600':
-                    syncStatus.includes('等待') ||
-                    syncStatus.includes('離線') ||
-                    syncStatus.includes('暫停') ||
-                    syncStatus.includes('較新'),
+                  'text-amber-600': syncStatus.includes('等待') || syncStatus.includes('離線') || syncStatus.includes('暫停') || syncStatus.includes('較新'),
                   'text-rose-600': syncStatus.includes('失敗'),
                   'text-slate-500': !syncStatus
                 }"
                 x-text="syncStatus"
               ></div>
-
             </div>
 
-            <button
-              @click="signOutFirebase()"
-              class="shrink-0 text-xs text-slate-500 hover:underline"
-            >
-              登出
-            </button>
-
+            <button @click="signOutFirebase()" class="shrink-0 text-xs text-slate-500 hover:underline">登出</button>
           </div>
 
           <div class="flex gap-2">
-
             <button
               x-show="syncStatus === '雲端有較新資料'"
               @click="reviewLatestCloudData()"
@@ -321,867 +229,304 @@
               @click="manualCloudSync()"
               :disabled="cloudBusy || showCloudConflictModal"
               class="flex-1 bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-medium py-1.5 rounded-lg disabled:opacity-50"
-              x-text="
-                cloudBusy
-                  ? '處理中…'
-                  : (
-                      cloudSyncEnabled
-                        ? '立即備份'
-                        : '重新檢查'
-                    )
-              "
+              x-text="cloudBusy ? '處理中…' : (cloudSyncEnabled ? '立即備份' : '重新檢查')"
             ></button>
-
           </div>
-
         </div>
-
       </template>
-
     </div>
   </section>
 
   <!-- 主內容區塊 -->
   <main class="max-w-md mx-auto px-4 mt-4 space-y-4">
 
-    <!-- 頁籤 -->
+    <!-- 頁籤分頁 -->
     <div class="flex bg-slate-200 p-1 rounded-xl text-sm font-medium">
-
-      <button
-        @click="activeTab = 'expenses'"
-        :class="
-          activeTab === 'expenses'
-            ? 'bg-white text-indigo-600 shadow'
-            : 'text-slate-600'
-        "
-        class="flex-1 py-2 text-center rounded-lg transition"
-      >
-        消費明細
-      </button>
-
-      <button
-        @click="activeTab = 'settlement'"
-        :class="
-          activeTab === 'settlement'
-            ? 'bg-white text-indigo-600 shadow'
-            : 'text-slate-600'
-        "
-        class="flex-1 py-2 text-center rounded-lg transition"
-      >
-        結算方案
-      </button>
-
-      <button
-        @click="activeTab = 'ai'"
-        :class="
-          activeTab === 'ai'
-            ? 'bg-white text-indigo-600 shadow'
-            : 'text-slate-600'
-        "
-        class="flex-1 py-2 text-center rounded-lg transition"
-      >
-        🤖 AI 助手
-      </button>
-
+      <button @click="activeTab = 'expenses'" :class="activeTab === 'expenses' ? 'bg-white text-indigo-600 shadow' : 'text-slate-600'" class="flex-1 py-2 text-center rounded-lg transition">消費明細</button>
+      <button @click="activeTab = 'settlement'" :class="activeTab === 'settlement' ? 'bg-white text-indigo-600 shadow' : 'text-slate-600'" class="flex-1 py-2 text-center rounded-lg transition">結算方案</button>
+      <button @click="activeTab = 'ai'" :class="activeTab === 'ai' ? 'bg-white text-indigo-600 shadow' : 'text-slate-600'" class="flex-1 py-2 text-center rounded-lg transition">🤖 AI 助手</button>
     </div>
 
-    <!-- 消費明細 -->
-    <div
-      x-show="activeTab === 'expenses'"
-      class="space-y-4"
-    >
-
+    <!-- 頁籤 1: 消費明細列表 -->
+    <div x-show="activeTab === 'expenses'" class="space-y-4">
       <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
-
-        <div class="text-xs text-indigo-100">
-          行程總消費估計
-        </div>
-
-        <div
-          class="text-3xl font-extrabold mt-1"
-          x-text="
-            trip.baseCurrency +
-            ' $' +
-            formatNumber(
-              calculateTotalTripBase()
-            )
-          "
-        ></div>
-
+        <div class="text-xs text-indigo-100">行程總消費估計</div>
+        <div class="text-3xl font-extrabold mt-1" x-text="trip.baseCurrency + ' $' + formatNumber(calculateTotalTripBase())"></div>
         <div class="text-xs text-indigo-100 mt-2 flex justify-between">
-
-          <span>
-            共
-            <strong x-text="trip.expenses.length"></strong>
-            筆消費紀錄
-          </span>
-
-          <span>
-            人均：
-            <strong
-              x-text="
-                trip.baseCurrency +
-                ' $' +
-                formatNumber(
-                  calculateTotalTripBase() /
-                  (trip.members.length || 1)
-                )
-              "
-            ></strong>
-          </span>
-
+          <span>共 <strong x-text="trip.expenses.length"></strong> 筆消費紀錄</span>
+          <span>人均：<strong x-text="trip.baseCurrency + ' $' + formatNumber(calculateTotalTripBase() / (trip.members.length || 1))"></strong></span>
         </div>
-
       </div>
 
       <div class="flex gap-2">
-
-        <button
-          @click="openExpenseModal()"
-          class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-xl shadow flex items-center justify-center gap-1.5 transition"
-        >
-
-          <svg
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            ></path>
-          </svg>
-
+        <button @click="openExpenseModal()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-xl shadow flex items-center justify-center gap-1.5 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           新增消費紀錄
-
         </button>
-
-        <button
-          @click="triggerPhotoScan()"
-          class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2.5 rounded-xl shadow flex items-center gap-1 transition"
-        >
+        <button @click="triggerPhotoScan()" class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2.5 rounded-xl shadow flex items-center gap-1 transition">
           📷 掃描收據
         </button>
-
       </div>
 
       <div class="space-y-2">
-
         <template x-if="trip.expenses.length === 0">
-
           <div class="bg-white rounded-xl p-8 text-center text-slate-400 border border-slate-200">
             尚無消費紀錄，點擊上方按鈕新增！
           </div>
-
         </template>
 
-        <template
-          x-for="(exp, index) in trip.expenses"
-          :key="exp.id || index"
-        >
-
+        <template x-for="(exp, index) in trip.expenses" :key="exp.id || index">
           <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-
             <div class="flex items-center space-x-3">
-
-              <div
-                class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm"
-                x-text="getCategoryEmoji(exp.category)"
-              ></div>
-
+              <div class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm" x-text="getCategoryEmoji(exp.category)"></div>
               <div>
-
-                <div
-                  class="font-bold text-slate-800 text-sm"
-                  x-text="exp.title"
-                ></div>
-
+                <div class="font-bold text-slate-800 text-sm" x-text="exp.title"></div>
                 <div class="text-xs text-slate-500 mt-0.5">
-
-                  <span
-                    class="text-indigo-600 font-medium"
-                    x-text="exp.payer"
-                  ></span>
-
-                  付款
-
-                  <span class="text-slate-300">
-                    |
-                  </span>
-
-                  <span
-                    x-text="
-                      exp.participants.length +
-                      ' 人分攤' +
-                      (
-                        hasCustomShares(exp)
-                          ? ' (含指定金額)'
-                          : ''
-                      )
-                    "
-                  ></span>
-
+                  <span class="text-indigo-600 font-medium" x-text="exp.payer"></span> 付款
+                  <span class="text-slate-300">|</span>
+                  <span x-text="exp.participants.length + ' 人分攤' + (hasCustomShares(exp) ? ' (含指定金額)' : '')"></span>
                 </div>
-
               </div>
-
             </div>
-
             <div class="text-right">
-
-              <div
-                class="font-bold text-slate-800"
-                x-text="
-                  exp.currency +
-                  ' $' +
-                  formatNumber(exp.amount)
-                "
-              ></div>
-
-              <div
-                class="text-xs text-slate-400"
-                x-show="exp.currency !== trip.baseCurrency"
-                x-text="
-                  '≈ ' +
-                  trip.baseCurrency +
-                  ' $' +
-                  formatNumber(
-                    convertToBase(
-                      exp.amount,
-                      exp.currency
-                    )
-                  )
-                "
-              ></div>
-
+              <div class="font-bold text-slate-800" x-text="exp.currency + ' $' + formatNumber(exp.amount)"></div>
+              <div class="text-xs text-slate-400" x-show="exp.currency !== trip.baseCurrency" x-text="'≈ ' + trip.baseCurrency + ' $' + formatNumber(convertToBase(exp.amount, exp.currency))"></div>
               <div class="flex justify-end gap-2 mt-1">
-
-                <button
-                  @click="openExpenseModal(exp)"
-                  class="text-xs text-indigo-600 hover:underline"
-                >
-                  編輯
-                </button>
-
-                <button
-                  @click="deleteExpense(exp.id)"
-                  class="text-xs text-rose-500 hover:underline"
-                >
-                  刪除
-                </button>
-
+                <button @click="openExpenseModal(exp)" class="text-xs text-indigo-600 hover:underline">編輯</button>
+                <button @click="deleteExpense(exp.id)" class="text-xs text-rose-500 hover:underline">刪除</button>
               </div>
-
             </div>
-
           </div>
-
         </template>
-
       </div>
-
     </div>
 
-    <!-- 結算方案 -->
-    <div
-      x-show="activeTab === 'settlement'"
-      class="space-y-4"
-    >
-
+    <!-- 頁籤 2: 最佳化拆帳結算 -->
+    <div x-show="activeTab === 'settlement'" class="space-y-4">
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-
-        <h2 class="font-bold text-slate-800 text-base mb-1">
-          成員個人收支狀態
-        </h2>
-
-        <p class="text-xs text-slate-500 mb-3">
-          正數 (+) 為應收回款項，負數 (-) 為應補繳款項。
-        </p>
-
+        <h2 class="font-bold text-slate-800 text-base mb-1">成員個人收支狀態</h2>
+        <p class="text-xs text-slate-500 mb-3">正數 (+) 為應收回款項，負數 (-) 為應補繳款項。</p>
         <div class="space-y-2">
-
-          <template
-            x-for="m in memberBalances"
-            :key="m.name"
-          >
-
+          <template x-for="m in memberBalances" :key="m.name">
             <div class="flex justify-between items-center py-2 border-b border-slate-100 last:border-0 text-sm">
-
-              <span
-                class="font-medium text-slate-700"
-                x-text="m.name"
-              ></span>
-
+              <span class="font-medium text-slate-700" x-text="m.name"></span>
               <div class="text-right">
-
-                <span
-                  :class="
-                    m.net >= 0
-                      ? 'text-emerald-600 font-bold'
-                      : 'text-rose-600 font-bold'
-                  "
-                  x-text="
-                    (m.net >= 0 ? '+' : '') +
-                    trip.baseCurrency +
-                    ' $' +
-                    formatNumber(m.net)
-                  "
-                ></span>
-
+                <span :class="m.net >= 0 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'"
+                      x-text="(m.net >= 0 ? '+' : '') + trip.baseCurrency + ' $' + formatNumber(m.net)"></span>
               </div>
-
             </div>
-
           </template>
-
         </div>
-
       </div>
 
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-
         <div class="flex justify-between items-center">
-
-          <h2 class="font-bold text-slate-800 text-base">
-            最佳化簡化轉帳方案
-          </h2>
-
-          <button
-            @click="copySettlementReport()"
-            class="text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md font-medium transition"
-          >
-            一鍵複製文字
-          </button>
-
+          <h2 class="font-bold text-slate-800 text-base">最佳化簡化轉帳方案</h2>
+          <button @click="copySettlementReport()" class="text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md font-medium transition">一鍵複製文字</button>
         </div>
 
         <template x-if="settlementPlan.length === 0">
-
-          <p class="text-slate-400 text-sm text-center py-4">
-            帳目已完全平算，無需再轉帳！🎉
-          </p>
-
+          <p class="text-slate-400 text-sm text-center py-4">帳目已完全平算，無需再轉帳！🎉</p>
         </template>
 
         <div class="space-y-2">
-
-          <template
-            x-for="(plan, idx) in settlementPlan"
-            :key="idx"
-          >
-
+          <template x-for="(plan, idx) in settlementPlan" :key="idx">
             <div class="bg-indigo-50/60 p-3 rounded-lg border border-indigo-100 flex items-center justify-between text-sm">
-
               <div class="flex items-center space-x-2">
-
-                <span
-                  class="font-bold text-slate-800"
-                  x-text="plan.from"
-                ></span>
-
-                <span class="text-slate-400">
-                  ➔
-                </span>
-
-                <span
-                  class="font-bold text-slate-800"
-                  x-text="plan.to"
-                ></span>
-
+                <span class="font-bold text-slate-800" x-text="plan.from"></span>
+                <span class="text-slate-400">➔</span>
+                <span class="font-bold text-slate-800" x-text="plan.to"></span>
               </div>
-
-              <div
-                class="font-extrabold text-indigo-700"
-                x-text="
-                  trip.baseCurrency +
-                  ' $' +
-                  formatNumber(plan.amount)
-                "
-              ></div>
-
+              <div class="font-extrabold text-indigo-700" x-text="trip.baseCurrency + ' $' + formatNumber(plan.amount)"></div>
             </div>
-
           </template>
-
         </div>
-
       </div>
-
     </div>
 
-    <!-- AI 助手 -->
-    <div
-      x-show="activeTab === 'ai'"
-      class="space-y-4"
-    >
-
+    <!-- 頁籤 3: AI 智慧助手 -->
+    <div x-show="activeTab === 'ai'" class="space-y-4">
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-
         <h2 class="font-bold text-slate-800 text-base flex items-center gap-1.5">
           📸 AI 拍照/相簿收據自動辨識 (Vision)
         </h2>
-
-        <p class="text-xs text-slate-500">
-          拍照或上傳相簿收據，AI 自動萃取金額與細節。圖片大小上限 10 MB。
-        </p>
-
-        <input
-          type="file"
-          id="receiptInput"
-          accept="image/*"
-          @change="handleReceiptUpload($event)"
-          class="hidden"
-        >
+        <p class="text-xs text-slate-500">拍照或上傳收據，Gemini 會辨識商戶、總額、幣別及類別，再開啟表格讓你確認。支援 JPEG、PNG、WebP；圖片上限 10 MB。</p>
 
         <div
-          @click="triggerPhotoScan()"
-          class="border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl p-4 text-center cursor-pointer bg-indigo-50/50 transition"
-        >
+          class="rounded-lg px-3 py-2 text-xs"
+          :class="aiReady ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
+          x-text="aiReady ? 'AI 已準備完成；辨識結果不會自動儲存。' : (aiInitError || 'AI 正在初始化…')"
+        ></div>
 
+        <input type="file" id="receiptInput" accept="image/jpeg,image/png,image/webp" @change="handleReceiptUpload($event)" class="hidden">
+        
+        <div @click="triggerPhotoScan()" class="border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl p-4 text-center cursor-pointer bg-indigo-50/50 transition">
           <template x-if="!receiptImage">
-
             <div>
-              <div class="text-3xl mb-1">
-                🖼️ / 📷
-              </div>
-
-              <div class="text-xs font-semibold text-indigo-600">
-                點擊選擇相簿照片或拍照
-              </div>
+              <div class="text-3xl mb-1">🖼️ / 📷</div>
+              <div class="text-xs font-semibold text-indigo-600">點擊選擇相簿照片或拍照</div>
             </div>
-
           </template>
-
           <template x-if="receiptImage">
-
             <div class="space-y-2">
-
-              <img
-                :src="receiptImage"
-                class="max-h-40 mx-auto rounded-lg shadow-sm border"
-              >
-
-              <div class="text-xs text-indigo-600 font-medium">
-                點擊更換照片
-              </div>
-
+              <img :src="receiptImage" class="max-h-40 mx-auto rounded-lg shadow-sm border">
+              <div class="text-xs text-indigo-600 font-medium">點擊更換照片</div>
             </div>
-
           </template>
-
         </div>
 
-        <button
-          @click="analyzeReceiptWithAI()"
-          :disabled="!receiptImage || visionLoading"
-          class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 rounded-lg text-sm transition disabled:opacity-50"
-        >
-
-          <span x-show="!visionLoading">
-            開始 AI 圖像辨識填單
-          </span>
-
-          <span x-show="visionLoading">
-            AI 辨識收據中...
-          </span>
-
+        <button @click="analyzeReceiptWithAI()" :disabled="!aiReady || !receiptImage || visionLoading" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 rounded-lg text-sm transition disabled:opacity-50">
+          <span x-show="!visionLoading">開始 AI 圖像辨識填單</span>
+          <span x-show="visionLoading">AI 辨識收據中...</span>
         </button>
-
       </div>
 
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-
         <h2 class="font-bold text-slate-800 text-base flex items-center gap-1.5">
           🗣️ AI 快速對話記帳
         </h2>
-
-        <textarea
-          x-model="aiPromptText"
-          rows="2"
-          placeholder="輸入描述，例如：昨天小明幫大家付了拉麵 12000 日圓，阿美沒吃"
-          class="w-full text-sm p-2.5 border rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
-        ></textarea>
-
-        <button
-          @click="parseExpenseWithAI()"
-          :disabled="aiLoading"
-          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm transition disabled:opacity-50"
-        >
-
-          <span x-show="!aiLoading">
-            AI 解析文字填單
-          </span>
-
-          <span x-show="aiLoading">
-            AI 解析中...
-          </span>
-
+        <p class="text-xs text-slate-500">AI 只會填寫表格，不會直接儲存。付款人及參與者只會從目前成員名單中選擇。</p>
+        <textarea x-model="aiPromptText" rows="3" placeholder="例如：昨天小明付了 12000 日圓吃拉麵，四人中阿美沒有吃" class="w-full text-sm p-2.5 border rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+        <button @click="parseExpenseWithAI()" :disabled="!aiReady || aiLoading" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm transition disabled:opacity-50">
+          <span x-show="!aiLoading">AI 解析文字填單</span>
+          <span x-show="aiLoading">AI 解析中...</span>
         </button>
-
       </div>
-
     </div>
 
   </main>
 
-  <!-- 同步與備份彈窗 -->
-  <div
-    x-show="showSyncModal"
-    class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-  >
-
+  <!-- 彈窗 1：跨裝置同步與備份 -->
+  <div x-show="showSyncModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
-
       <div class="flex justify-between items-center border-b pb-2">
-
-        <h3 class="font-bold text-slate-800 text-lg">
-          📲 跨裝置資料同步 / 備份
-        </h3>
-
-        <button
-          @click="showSyncModal = false"
-          class="text-slate-400"
-        >
-          ✕
-        </button>
-
+        <h3 class="font-bold text-slate-800 text-lg">📲 跨裝置資料同步 / 備份</h3>
+        <button @click="showSyncModal = false" class="text-slate-400">✕</button>
       </div>
 
       <div class="space-y-3 text-sm">
-
         <p class="text-xs text-slate-500 leading-relaxed">
           由於這是免費靜態網頁，資料預設儲存於本手機瀏覽器。如需切換瀏覽器或發給同行朋友同步，請使用下方功能：
         </p>
 
         <div class="space-y-2 pt-1">
-
-          <button
-            @click="generateShareLink()"
-            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 transition"
-          >
-            🔗 複製一鍵同步網址（發到 LINE 群組）
+          <button @click="generateShareLink()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 transition">
+            🔗 複製一鍵同步網址 (發到 LINE 群組)
           </button>
-
-          <button
-            @click="exportDataCode()"
-            class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium text-xs transition"
-          >
-            📋 複製資料文字代碼（備份）
+          <button @click="exportDataCode()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium text-xs transition">
+            📋 複製資料文字代碼 (備份)
           </button>
-
         </div>
 
         <div class="border-t pt-3">
-
-          <label class="block text-xs font-semibold text-slate-600 mb-1">
-            匯入其他裝置的資料
-          </label>
-
-          <textarea
-            x-model="importCodeInput"
-            rows="3"
-            placeholder="貼上從其他裝置複製的資料代碼..."
-            class="w-full text-xs p-2 border rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
-          ></textarea>
-
-          <button
-            @click="importDataCode()"
-            class="w-full mt-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium text-xs transition"
-          >
+          <label class="block text-xs font-semibold text-slate-600 mb-1">匯入其他裝置的資料</label>
+          <textarea x-model="importCodeInput" rows="3" placeholder="貼上從其他裝置複製的資料代碼..." class="w-full text-xs p-2 border rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+          <button @click="importDataCode()" class="w-full mt-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium text-xs transition">
             📥 覆蓋並匯入資料
           </button>
-
         </div>
-
       </div>
 
       <div class="flex justify-end border-t pt-2">
-
-        <button
-          @click="showSyncModal = false"
-          class="px-4 py-1.5 text-xs font-medium text-slate-600"
-        >
-          關閉
-        </button>
-
+        <button @click="showSyncModal = false" class="px-4 py-1.5 text-xs font-medium text-slate-600">關閉</button>
       </div>
-
     </div>
-
   </div>
 
-  <!-- 行程設定彈窗 -->
-  <div
-    x-show="showTripModal"
-    class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-  >
-
+  <!-- 彈窗 2：行程設定 -->
+  <div x-show="showTripModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
-
       <div class="flex justify-between items-center border-b pb-2">
-
-        <h3 class="font-bold text-slate-800 text-lg">
-          行程與成員設定
-        </h3>
-
-        <button
-          @click="showTripModal = false"
-          class="text-slate-400"
-        >
-          ✕
-        </button>
-
+        <h3 class="font-bold text-slate-800 text-lg">行程與成員設定</h3>
+        <button @click="showTripModal = false" class="text-slate-400">✕</button>
       </div>
 
       <div class="space-y-3">
-
         <div>
-
-          <label class="block text-xs font-semibold text-slate-600 mb-1">
-            行程名稱
-          </label>
-
-          <input
-            type="text"
-            x-model="tempTrip.name"
-            class="w-full text-sm border p-2 rounded-lg outline-none"
-          >
-
+          <label class="block text-xs font-semibold text-slate-600 mb-1">行程名稱</label>
+          <input type="text" x-model="tempTrip.name" class="w-full text-sm border p-2 rounded-lg outline-none">
         </div>
 
         <div>
-
-          <label class="block text-xs font-semibold text-slate-600 mb-1">
-            預設本位幣
-          </label>
-
-          <select
-            x-model="tempTrip.baseCurrency"
-            class="w-full text-sm border p-2 rounded-lg bg-white"
-          >
-
-            <template
-              x-for="c in currencies"
-              :key="c"
-            >
-              <option
-                :value="c"
-                x-text="c"
-              ></option>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">預設本位幣</label>
+          <select x-model="tempTrip.baseCurrency" class="w-full text-sm border p-2 rounded-lg bg-white">
+            <template x-for="c in currencies" :key="c">
+              <option :value="c" x-text="c"></option>
             </template>
-
           </select>
-
         </div>
 
         <div>
-
-          <label class="block text-xs font-semibold text-slate-600 mb-1">
-            旅行成員名單
-          </label>
-
+          <label class="block text-xs font-semibold text-slate-600 mb-1">旅行成員名單</label>
           <div class="space-y-2 max-h-36 overflow-y-auto p-1">
-
-            <template
-              x-for="(m, idx) in tempTrip.members"
-              :key="idx"
-            >
-
+            <template x-for="(m, idx) in tempTrip.members" :key="idx">
               <div class="flex items-center space-x-2">
-
-                <input
-                  type="text"
-                  x-model="tempTrip.members[idx]"
-                  class="flex-1 text-sm border p-1.5 rounded-md"
-                >
-
-                <button
-                  @click="removeMemberFromTemp(idx)"
-                  class="text-rose-500 text-xs px-2 py-1"
-                >
-                  刪除
-                </button>
-
+                <input type="text" x-model="tempTrip.members[idx]" class="flex-1 text-sm border p-1.5 rounded-md">
+                <button @click="removeMemberFromTemp(idx)" class="text-rose-500 text-xs px-2 py-1">刪除</button>
               </div>
-
             </template>
-
           </div>
-
           <div class="flex gap-2 mt-2">
-
-            <input
-              type="text"
-              x-model="newMemberName"
-              placeholder="新成員姓名..."
-              class="flex-1 text-sm border p-1.5 rounded-md"
-            >
-
-            <button
-              @click="addMemberToTemp()"
-              class="bg-indigo-50 text-indigo-600 font-medium px-3 text-xs rounded-md"
-            >
-              ＋ 新增
-            </button>
-
+            <input type="text" x-model="newMemberName" placeholder="新成員姓名..." class="flex-1 text-sm border p-1.5 rounded-md">
+            <button @click="addMemberToTemp()" class="bg-indigo-50 text-indigo-600 font-medium px-3 text-xs rounded-md">＋ 新增</button>
           </div>
-
         </div>
-
       </div>
 
       <div class="flex justify-end gap-2 pt-2 border-t">
-
-        <button
-          @click="showTripModal = false"
-          class="px-4 py-2 text-xs font-medium text-slate-600"
-        >
-          取消
-        </button>
-
-        <button
-          @click="saveTripSettings()"
-          class="px-4 py-2 text-xs font-medium bg-indigo-600 text-white rounded-lg"
-        >
-          儲存設定
-        </button>
-
+        <button @click="showTripModal = false" class="px-4 py-2 text-xs font-medium text-slate-600">取消</button>
+        <button @click="saveTripSettings()" class="px-4 py-2 text-xs font-medium bg-indigo-600 text-white rounded-lg">儲存設定</button>
       </div>
-
     </div>
-
   </div>
 
-  <!-- 新增／編輯消費彈窗 -->
-  <div
-    x-show="showExpenseModal"
-    class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-  >
-
+  <!-- 彈窗 3：新增/編輯消費 -->
+  <div x-show="showExpenseModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
-
       <div class="flex justify-between items-center border-b pb-2">
-
-        <h3
-          class="font-bold text-slate-800 text-lg"
-          x-text="
-            formExpense.id
-              ? '編輯消費紀錄'
-              : '新增消費紀錄'
-          "
-        ></h3>
-
-        <button
-          @click="showExpenseModal = false"
-          class="text-slate-400"
-        >
-          ✕
-        </button>
-
+        <h3 class="font-bold text-slate-800 text-lg" x-text="formExpense.id ? '編輯消費紀錄' : '新增消費紀錄'"></h3>
+        <button @click="showExpenseModal = false" class="text-slate-400">✕</button>
       </div>
 
       <div class="space-y-3 text-sm">
+        <div
+          x-show="aiReviewMessage"
+          class="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg p-2.5 leading-relaxed"
+          x-text="aiReviewMessage"
+        ></div>
 
         <div>
-
-          <label class="block text-xs font-semibold text-slate-600 mb-1">
-            消費項目／名稱
-          </label>
-
-          <input
-            type="text"
-            x-model="formExpense.title"
-            placeholder="例如：晚餐、計程車"
-            class="w-full border p-2 rounded-lg"
-          >
-
+          <label class="block text-xs font-semibold text-slate-600 mb-1">消費項目/名稱</label>
+          <input type="text" x-model="formExpense.title" placeholder="例如：晚餐、計程車" class="w-full border p-2 rounded-lg">
         </div>
 
         <div class="grid grid-cols-2 gap-2">
-
           <div>
-
-            <label class="block text-xs font-semibold text-slate-600 mb-1">
-              總金額
-            </label>
-
-            <input
-              type="number"
-              step="any"
-              x-model.number="formExpense.amount"
-              placeholder="0.00"
-              class="w-full border p-2 rounded-lg"
-            >
-
+            <label class="block text-xs font-semibold text-slate-600 mb-1">總金額</label>
+            <input type="number" step="any" x-model.number="formExpense.amount" placeholder="0.00" class="w-full border p-2 rounded-lg">
           </div>
-
           <div>
-
-            <label class="block text-xs font-semibold text-slate-600 mb-1">
-              幣別
-            </label>
-
-            <select
-              x-model="formExpense.currency"
-              class="w-full border p-2 rounded-lg bg-white"
-            >
-
-              <template
-                x-for="c in currencies"
-                :key="c"
-              >
-                <option
-                  :value="c"
-                  x-text="c"
-                ></option>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">幣別</label>
+            <select x-model="formExpense.currency" class="w-full border p-2 rounded-lg bg-white">
+              <template x-for="c in currencies" :key="c">
+                <option :value="c" x-text="c"></option>
               </template>
-
             </select>
-
           </div>
-
         </div>
 
         <div class="grid grid-cols-2 gap-2">
-
           <div>
-
-            <label class="block text-xs font-semibold text-slate-600 mb-1">
-              先墊付款人
-            </label>
-
-            <select
-              x-model="formExpense.payer"
-              class="w-full border p-2 rounded-lg bg-white"
-            >
-
-              <template
-                x-for="m in trip.members"
-                :key="m"
-              >
-                <option
-                  :value="m"
-                  x-text="m"
-                ></option>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">先墊付款人</label>
+            <select x-model="formExpense.payer" class="w-full border p-2 rounded-lg bg-white">
+              <template x-for="m in trip.members" :key="m">
+                <option :value="m" x-text="m"></option>
               </template>
-
             </select>
-
           </div>
-
           <div>
-
-            <label class="block text-xs font-semibold text-slate-600 mb-1">
-              類別
-            </label>
-
-            <select
-              x-model="formExpense.category"
-              class="w-full border p-2 rounded-lg bg-white"
-            >
+            <label class="block text-xs font-semibold text-slate-600 mb-1">類別</label>
+            <select x-model="formExpense.category" class="w-full border p-2 rounded-lg bg-white">
               <option value="餐飲">🍱 餐飲</option>
               <option value="住宿">🏨 住宿</option>
               <option value="交通">🚗 交通</option>
@@ -1189,182 +534,66 @@
               <option value="娛樂">🎟️ 娛樂</option>
               <option value="其他">💡 其他</option>
             </select>
-
           </div>
-
         </div>
 
+        <!-- 拆帳分配區 -->
         <div>
-
           <div class="flex justify-between items-center mb-1">
-
-            <label class="text-xs font-semibold text-slate-600">
-              參與拆帳成員與金額分配
-            </label>
-
-            <span class="text-[10px] text-slate-400">
-              未填金額者將自動平分剩餘數額
-            </span>
-
+            <label class="text-xs font-semibold text-slate-600">參與拆帳成員與金額分配</label>
+            <span class="text-[10px] text-slate-400">未填金額者將自動平分剩餘數額</span>
           </div>
-
           <div class="space-y-2 border p-2.5 rounded-lg max-h-48 overflow-y-auto bg-slate-50/50">
-
-            <template
-              x-for="m in trip.members"
-              :key="m"
-            >
-
+            <template x-for="m in trip.members" :key="m">
               <div class="flex items-center justify-between gap-2 text-xs bg-white p-1.5 rounded border border-slate-100">
-
                 <label class="flex items-center space-x-2 cursor-pointer flex-1">
-
-                  <input
-                    type="checkbox"
-                    :value="m"
-                    x-model="formExpense.participants"
-                    class="rounded text-indigo-600"
-                  >
-
-                  <span
-                    class="font-medium text-slate-700"
-                    x-text="m"
-                  ></span>
-
+                  <input type="checkbox" :value="m" x-model="formExpense.participants" class="rounded text-indigo-600">
+                  <span class="font-medium text-slate-700" x-text="m"></span>
                 </label>
-
-                <div
-                  class="flex items-center space-x-1"
-                  x-show="formExpense.participants.includes(m)"
-                >
-
-                  <span
-                    class="text-[10px] text-slate-400"
-                    x-text="'指定 (' + formExpense.currency + '):'"
-                  ></span>
-
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="自動平分"
-                    x-model.number="formExpense.customShares[m]"
-                    class="w-20 text-right border rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-
+                <div class="flex items-center space-x-1" x-show="formExpense.participants.includes(m)">
+                  <span class="text-[10px] text-slate-400" x-text="'指定 (' + formExpense.currency + '):'"></span>
+                  <input type="number" step="any" placeholder="自動平分" 
+                         x-model.number="formExpense.customShares[m]" 
+                         class="w-20 text-right border rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500">
                 </div>
-
               </div>
-
             </template>
-
           </div>
-
         </div>
-
       </div>
 
       <div class="flex justify-end gap-2 pt-2 border-t">
-
-        <button
-          @click="showExpenseModal = false"
-          class="px-4 py-2 text-xs font-medium text-slate-600"
-        >
-          取消
-        </button>
-
-        <button
-          @click="saveExpense()"
-          class="px-4 py-2 text-xs font-medium bg-indigo-600 text-white rounded-lg"
-        >
-          儲存紀錄
-        </button>
-
+        <button @click="showExpenseModal = false" class="px-4 py-2 text-xs font-medium text-slate-600">取消</button>
+        <button @click="saveExpense()" class="px-4 py-2 text-xs font-medium bg-indigo-600 text-white rounded-lg">儲存紀錄</button>
       </div>
-
     </div>
-
   </div>
 
-  <!-- 本機與雲端版本衝突 -->
-  <div
-    x-show="showCloudConflictModal"
-    class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
-  >
-
+  <!-- 本機與雲端版本衝突處理 -->
+  <div x-show="showCloudConflictModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
-
       <div>
-
-        <h3 class="font-bold text-slate-800 text-lg">
-          偵測到兩個不同版本
-        </h3>
-
-        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-          為免自動覆蓋資料，請選擇要保留哪一份。選擇前不會上傳或覆蓋任何一方。
-        </p>
-
+        <h3 class="font-bold text-slate-800 text-lg">偵測到兩個不同版本</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">為免自動覆蓋資料，請選擇要保留哪一份。選擇前不會上傳或覆蓋任何一方。</p>
       </div>
 
       <div class="grid grid-cols-2 gap-3 text-xs">
-
         <div class="border border-indigo-200 bg-indigo-50/50 rounded-xl p-3">
-
-          <div class="font-bold text-indigo-700">
-            本機版本
-          </div>
-
-          <div
-            class="mt-2 text-slate-700 break-words"
-            x-text="trip.name"
-          ></div>
-
-          <div
-            class="text-slate-500 mt-1"
-            x-text="trip.expenses.length + ' 筆消費'"
-          ></div>
-
-          <div
-            class="text-slate-400 mt-1"
-            x-text="formatDateTime(lastLocalUpdatedAt)"
-          ></div>
-
+          <div class="font-bold text-indigo-700">本機版本</div>
+          <div class="mt-2 text-slate-700 break-words" x-text="trip.name"></div>
+          <div class="text-slate-500 mt-1" x-text="trip.expenses.length + ' 筆消費'" ></div>
+          <div class="text-slate-400 mt-1" x-text="formatDateTime(lastLocalUpdatedAt)"></div>
         </div>
 
         <div class="border border-emerald-200 bg-emerald-50/50 rounded-xl p-3">
-
-          <div class="font-bold text-emerald-700">
-            雲端版本
-          </div>
-
-          <div
-            class="mt-2 text-slate-700 break-words"
-            x-text="
-              cloudConflictTrip
-                ? cloudConflictTrip.name
-                : '—'
-            "
-          ></div>
-
-          <div
-            class="text-slate-500 mt-1"
-            x-text="
-              cloudConflictTrip
-                ? cloudConflictTrip.expenses.length + ' 筆消費'
-                : '—'
-            "
-          ></div>
-
-          <div
-            class="text-slate-400 mt-1"
-            x-text="formatDateTime(cloudConflictUpdatedAt)"
-          ></div>
-
+          <div class="font-bold text-emerald-700">雲端版本</div>
+          <div class="mt-2 text-slate-700 break-words" x-text="cloudConflictTrip ? cloudConflictTrip.name : '—'"></div>
+          <div class="text-slate-500 mt-1" x-text="cloudConflictTrip ? cloudConflictTrip.expenses.length + ' 筆消費' : '—'"></div>
+          <div class="text-slate-400 mt-1" x-text="formatDateTime(cloudConflictUpdatedAt)"></div>
         </div>
-
       </div>
 
       <div class="space-y-2">
-
         <button
           @click="useCloudVersion()"
           :disabled="cloudBusy"
@@ -1388,125 +617,56 @@
         >
           暫不同步，兩邊都保留
         </button>
-
       </div>
-
     </div>
-
   </div>
 
-  <!-- 一般提示 -->
-  <div
-    x-show="toast.show"
-    x-transition
-    class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-4 py-2.5 rounded-full shadow-lg z-50"
-  >
+  <div x-show="toast.show" x-transition class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-4 py-2.5 rounded-full shadow-lg z-50">
     <span x-text="toast.message"></span>
   </div>
 
-  <!-- 復原刪除 -->
-  <div
-    x-show="undoDelete.show"
-    x-transition
-    class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-4 py-2.5 rounded-full shadow-lg z-50 flex items-center gap-3"
-  >
-
-    <span>
-      已刪除消費紀錄
-    </span>
-
-    <button
-      @click="undoDeleteExpense()"
-      class="font-bold text-amber-300 hover:text-amber-200"
-    >
-      復原
-    </button>
-
+  <div x-show="undoDelete.show" x-transition class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-4 py-2.5 rounded-full shadow-lg z-50 flex items-center gap-3">
+    <span>已刪除消費紀錄</span>
+    <button @click="undoDeleteExpense()" class="font-bold text-amber-300 hover:text-amber-200">復原</button>
   </div>
 
   <script>
-    document.addEventListener("alpine:init", () => {
-      Alpine.data("expenseApp", () => ({
-
-        activeTab: "expenses",
-
-        currencies: [
-          "HKD",
-          "TWD",
-          "JPY",
-          "KRW",
-          "USD",
-          "EUR",
-          "THB"
-        ],
-
-        ratesToHKD: {
-          HKD: 1.0,
-          TWD: 0.24,
-          JPY: 0.052,
-          KRW: 0.0058,
-          USD: 7.81,
-          EUR: 8.45,
-          THB: 0.22
-        },
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('expenseApp', () => ({
+        activeTab: 'expenses',
+        currencies: ['HKD', 'TWD', 'JPY', 'KRW', 'USD', 'EUR', 'THB'],
+        ratesToHKD: { HKD: 1.0, TWD: 0.24, JPY: 0.052, KRW: 0.0058, USD: 7.81, EUR: 8.45, THB: 0.22 },
 
         trip: {
-          name: "東京歡樂 5 日遊",
-          baseCurrency: "HKD",
-          members: [
-            "小明",
-            "阿美",
-            "小華",
-            "老張"
-          ],
+          name: '東京歡樂 5 日遊',
+          baseCurrency: 'HKD',
+          members: ['小明', '阿美', '小華', '老張'],
           expenses: []
         },
 
         showSyncModal: false,
-        importCodeInput: "",
+        importCodeInput: '',
 
         showTripModal: false,
-
-        tempTrip: {
-          name: "",
-          baseCurrency: "HKD",
-          members: []
-        },
-
+        tempTrip: { name: '', baseCurrency: 'HKD', members: [] },
         tempOriginalMembers: [],
-        newMemberName: "",
+        newMemberName: '',
 
         showExpenseModal: false,
-
-        formExpense: {
-          id: null,
-          title: "",
-          amount: "",
-          currency: "HKD",
-          payer: "",
-          category: "餐飲",
-          participants: [],
-          customShares: {}
-        },
+        formExpense: { id: null, title: '', amount: '', currency: 'HKD', payer: '', category: '餐飲', participants: [], customShares: {} },
 
         receiptImage: null,
         receiptBase64: null,
+        receiptMimeType: '',
         visionLoading: false,
 
-        aiPromptText: "",
+        aiPromptText: '',
         aiLoading: false,
-
-        toast: {
-          show: false,
-          message: ""
-        },
-
-        undoDelete: {
-          show: false,
-          expense: null,
-          index: -1,
-          timer: null
-        },
+        aiReady: false,
+        aiInitError: '',
+        aiReviewMessage: '',
+        toast: { show: false, message: '' },
+        undoDelete: { show: false, expense: null, index: -1, timer: null },
 
         firebaseReady: false,
         firebaseLoadFailed: false,
@@ -1515,7 +675,7 @@
         cloudBusy: false,
         cloudSyncEnabled: false,
         cloudUnsubscribe: null,
-        syncStatus: "正在初始化雲端功能",
+        syncStatus: '正在初始化雲端功能',
         hasStoredLocalData: false,
         lastLocalUpdatedAt: 0,
         showCloudConflictModal: false,
@@ -1525,150 +685,64 @@
         pendingCloudUpdatedAt: 0,
 
         async init() {
-          const dataKey =
-            "travel_expense_data";
-
-          const metaKey =
-            "travel_expense_meta";
+          const dataKey = 'travel_expense_data';
+          const metaKey = 'travel_expense_meta';
 
           let storedRaw = null;
 
           try {
-            storedRaw =
-              localStorage.getItem(dataKey);
+            storedRaw = localStorage.getItem(dataKey);
+            this.hasStoredLocalData = Boolean(storedRaw);
 
-            this.hasStoredLocalData =
-              Boolean(storedRaw);
-
-            const storedMeta = JSON.parse(
-              localStorage.getItem(metaKey) ||
-              "{}"
-            );
-
-            this.lastLocalUpdatedAt =
-              Number(storedMeta.updatedAtMs) ||
-              0;
+            const storedMeta = JSON.parse(localStorage.getItem(metaKey) || '{}');
+            this.lastLocalUpdatedAt = Number(storedMeta.updatedAtMs) || 0;
           } catch (error) {
-            console.warn(
-              "Local storage unavailable",
-              error
-            );
-
+            console.warn('Local storage unavailable', error);
             this.hasStoredLocalData = false;
             this.lastLocalUpdatedAt = 0;
           }
 
-          const urlParams =
-            new URLSearchParams(
-              window.location.search
-            );
-
-          const sharedData =
-            urlParams.get("data");
+          const urlParams = new URLSearchParams(window.location.search);
+          const sharedData = urlParams.get('data');
 
           if (sharedData) {
             try {
-              const decoded = JSON.parse(
-                decodeURIComponent(
-                  atob(sharedData)
-                )
-              );
-
+              const decoded = JSON.parse(decodeURIComponent(atob(sharedData)));
               if (decoded && decoded.name) {
                 this.trip = decoded;
-
-                if (
-                  this.saveData(
-                    "從分享連結匯入"
-                  )
-                ) {
-                  window.history.replaceState(
-                    {},
-                    document.title,
-                    window.location.pathname
-                  );
-
-                  this.showToast(
-                    "已成功從分享連結載入最新行程資料！"
-                  );
+                if (this.saveData('從分享連結匯入')) {
+                  window.history.replaceState({}, document.title, window.location.pathname);
+                  this.showToast('已成功從分享連結載入最新行程資料！');
                 }
               }
             } catch (error) {
-              console.warn(
-                "URL import failed",
-                error
-              );
-
-              this.showToast(
-                "分享網址資料無法讀取"
-              );
+              console.warn('URL import failed', error);
+              this.showToast('分享網址資料無法讀取');
             }
           } else if (storedRaw) {
             try {
-              const parsed =
-                JSON.parse(storedRaw);
-
-              if (parsed && parsed.name) {
-                this.trip = parsed;
-              }
+              const parsed = JSON.parse(storedRaw);
+              if (parsed && parsed.name) this.trip = parsed;
             } catch (error) {
-              console.warn(
-                "Local data loading failed",
-                error
-              );
-
-              this.showToast(
-                "本機資料讀取失敗"
-              );
+              console.warn('Local data loading failed', error);
+              this.showToast('本機資料讀取失敗');
             }
           }
 
-          if (
-            !Array.isArray(
-              this.trip.expenses
-            )
-          ) {
-            this.trip.expenses = [];
-          }
+          if (!Array.isArray(this.trip.expenses)) this.trip.expenses = [];
+          if (!Array.isArray(this.trip.members)) this.trip.members = [];
 
-          if (
-            !Array.isArray(
-              this.trip.members
-            )
-          ) {
-            this.trip.members = [];
-          }
-
-          window.addEventListener(
-            "online",
-            () => {
-              if (
-                this.firebaseUser &&
-                !this.cloudSyncEnabled &&
-                !this.showCloudConflictModal
-              ) {
-                this.reconcileCloudAndLocal();
-              } else if (
-                this.firebaseUser &&
-                this.syncStatus.includes(
-                  "離線"
-                )
-              ) {
-                this.syncStatus =
-                  "等待同步";
-              }
+          window.addEventListener('online', () => {
+            if (this.firebaseUser && !this.cloudSyncEnabled && !this.showCloudConflictModal) {
+              this.reconcileCloudAndLocal();
+            } else if (this.firebaseUser && this.syncStatus.includes('離線')) {
+              this.syncStatus = '等待同步';
             }
-          );
+          });
 
-          window.addEventListener(
-            "offline",
-            () => {
-              if (this.firebaseUser) {
-                this.syncStatus =
-                  "離線：資料已保存在本機";
-              }
-            }
-          );
+          window.addEventListener('offline', () => {
+            if (this.firebaseUser) this.syncStatus = '離線：資料已保存在本機';
+          });
 
           this.initializeFirebaseConnection();
         },
@@ -1676,472 +750,239 @@
         async initializeFirebaseConnection() {
           try {
             await window.firebaseReadyPromise;
-
             this.firebaseReady = true;
-            this.syncStatus =
-              "只儲存在此裝置";
+            this.syncStatus = '只儲存在此裝置';
 
-            const firebase =
-              window.firebaseBridge;
+            const firebase = window.firebaseBridge;
+            this.aiReady = Boolean(
+              firebase.ai &&
+              firebase.getGenerativeModel &&
+              firebase.Schema
+            );
+            this.aiInitError = this.aiReady
+              ? ''
+              : 'Firebase AI Logic 尚未準備完成';
 
             firebase.onAuthStateChanged(
               firebase.auth,
-
               async (user) => {
                 if (user) {
                   this.firebaseUser = {
                     uid: user.uid,
-                    email: user.email || "",
-                    displayName:
-                      user.displayName || "",
-                    photoURL:
-                      user.photoURL || ""
+                    email: user.email || '',
+                    displayName: user.displayName || '',
+                    photoURL: user.photoURL || ''
                   };
-
                   await this.reconcileCloudAndLocal();
                 } else {
                   if (this.cloudUnsubscribe) {
                     this.cloudUnsubscribe();
                     this.cloudUnsubscribe = null;
                   }
-
                   this.firebaseUser = null;
                   this.cloudSyncEnabled = false;
-                  this.syncStatus =
-                    "只儲存在此裝置";
+                  this.syncStatus = '只儲存在此裝置';
                 }
               },
-
               (error) => {
-                console.error(
-                  "Authentication state error",
-                  error
-                );
-
-                this.syncStatus =
-                  "登入狀態讀取失敗";
+                console.error('Authentication state error', error);
+                this.syncStatus = '登入狀態讀取失敗';
               }
             );
           } catch (error) {
-            console.error(
-              "Firebase unavailable",
-              error
-            );
-
+            console.error('Firebase unavailable', error);
             this.firebaseReady = false;
             this.firebaseLoadFailed = true;
-
-            this.syncStatus =
-              "雲端功能載入失敗；本機資料不受影響";
+            this.aiReady = false;
+            this.aiInitError = 'AI 載入失敗，請檢查網絡後重新整理';
+            this.syncStatus = '雲端功能載入失敗；本機資料不受影響';
           }
         },
 
         async signInWithGoogle() {
-          if (
-            !window.firebaseBridge ||
-            this.authLoading
-          ) {
-            return;
-          }
+          if (!window.firebaseBridge || this.authLoading) return;
 
           this.authLoading = true;
-
           try {
-            const firebase =
-              window.firebaseBridge;
-
-            const provider =
-              new firebase.GoogleAuthProvider();
-
-            await firebase.signInWithPopup(
-              firebase.auth,
-              provider
-            );
+            const firebase = window.firebaseBridge;
+            const provider = new firebase.GoogleAuthProvider();
+            await firebase.signInWithPopup(firebase.auth, provider);
           } catch (error) {
-            console.error(
-              "Google sign-in failed",
-              error
-            );
+            console.error('Google sign-in failed', error);
 
             const messages = {
-              "auth/popup-closed-by-user":
-                "登入視窗已關閉，未完成登入",
-
-              "auth/cancelled-popup-request":
-                "登入程序已取消",
-
-              "auth/popup-blocked":
-                "瀏覽器阻擋了登入視窗，請允許彈出視窗後重試",
-
-              "auth/unauthorized-domain":
-                "此 GitHub Pages 網域尚未加入 Firebase 已授權網域"
+              'auth/popup-closed-by-user': '登入視窗已關閉，未完成登入',
+              'auth/cancelled-popup-request': '登入程序已取消',
+              'auth/popup-blocked': '瀏覽器阻擋了登入視窗，請允許彈出視窗後重試',
+              'auth/unauthorized-domain': '此 GitHub Pages 網域尚未加入 Firebase 已授權網域'
             };
 
-            this.showToast(
-              messages[error.code] ||
-              "Google 登入失敗，請稍後再試"
-            );
+            this.showToast(messages[error.code] || 'Google 登入失敗，請稍後再試');
           } finally {
             this.authLoading = false;
           }
         },
 
         async signOutFirebase() {
-          if (!window.firebaseBridge) {
-            return;
-          }
+          if (!window.firebaseBridge) return;
 
           try {
             if (this.cloudUnsubscribe) {
               this.cloudUnsubscribe();
               this.cloudUnsubscribe = null;
             }
-
-            await window.firebaseBridge.signOut(
-              window.firebaseBridge.auth
-            );
-
-            this.showToast(
-              "已登出；資料仍保留在本機"
-            );
+            await window.firebaseBridge.signOut(window.firebaseBridge.auth);
+            this.showToast('已登出；資料仍保留在本機');
           } catch (error) {
-            console.error(
-              "Sign out failed",
-              error
-            );
-
-            this.showToast(
-              "登出失敗"
-            );
+            console.error('Sign out failed', error);
+            this.showToast('登出失敗');
           }
         },
 
         getCloudTripReference() {
-          const firebase =
-            window.firebaseBridge;
-
-          const user =
-            firebase?.auth?.currentUser;
-
-          if (!firebase || !user) {
-            return null;
-          }
+          const firebase = window.firebaseBridge;
+          const user = firebase?.auth?.currentUser;
+          if (!firebase || !user) return null;
 
           return firebase.doc(
             firebase.db,
-            "users",
+            'users',
             user.uid,
-            "trips",
-            "main"
+            'trips',
+            'main'
           );
         },
 
         normaliseTripData(data) {
-          const cloned = JSON.parse(
-            JSON.stringify(data || {})
-          );
-
-          if (
-            !Array.isArray(
-              cloned.expenses
-            )
-          ) {
-            cloned.expenses = [];
-          }
-
-          if (
-            !Array.isArray(
-              cloned.members
-            )
-          ) {
-            cloned.members = [];
-          }
-
-          if (!cloned.name) {
-            cloned.name =
-              "未命名行程";
-          }
-
-          if (!cloned.baseCurrency) {
-            cloned.baseCurrency =
-              "HKD";
-          }
-
+          const cloned = JSON.parse(JSON.stringify(data || {}));
+          if (!Array.isArray(cloned.expenses)) cloned.expenses = [];
+          if (!Array.isArray(cloned.members)) cloned.members = [];
+          if (!cloned.name) cloned.name = '未命名行程';
+          if (!cloned.baseCurrency) cloned.baseCurrency = 'HKD';
           return cloned;
         },
 
         tripsAreEqual(first, second) {
           try {
-            return (
-              JSON.stringify(
-                this.normaliseTripData(first)
-              ) ===
-              JSON.stringify(
-                this.normaliseTripData(second)
-              )
-            );
+            return JSON.stringify(this.normaliseTripData(first)) === JSON.stringify(this.normaliseTripData(second));
           } catch (error) {
             return false;
           }
         },
 
         getCloudUpdatedAt(data) {
-          if (
-            data?.updatedAt &&
-            typeof data.updatedAt.toMillis ===
-              "function"
-          ) {
+          if (data?.updatedAt && typeof data.updatedAt.toMillis === 'function') {
             return data.updatedAt.toMillis();
           }
-
-          return (
-            Number(
-              data?.clientUpdatedAtMs
-            ) || 0
-          );
+          return Number(data?.clientUpdatedAtMs) || 0;
         },
 
         formatDateTime(timestamp) {
-          const value =
-            Number(timestamp) || 0;
-
-          if (!value) {
-            return "時間不詳";
-          }
-
-          return new Date(
-            value
-          ).toLocaleString(
-            "zh-HK",
-            {
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit"
-            }
-          );
+          const value = Number(timestamp) || 0;
+          if (!value) return '時間不詳';
+          return new Date(value).toLocaleString('zh-HK', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
         },
 
-        saveLocalDataOnly(
-          updatedAtMs = Date.now()
-        ) {
+        saveLocalDataOnly(updatedAtMs = Date.now()) {
           try {
-            localStorage.setItem(
-              "travel_expense_data",
-              JSON.stringify(this.trip)
-            );
-
-            localStorage.setItem(
-              "travel_expense_meta",
-              JSON.stringify({
-                updatedAtMs,
-                schemaVersion: 1
-              })
-            );
-
-            this.lastLocalUpdatedAt =
-              updatedAtMs;
-
-            this.hasStoredLocalData =
-              true;
-
+            localStorage.setItem('travel_expense_data', JSON.stringify(this.trip));
+            localStorage.setItem('travel_expense_meta', JSON.stringify({
+              updatedAtMs,
+              schemaVersion: 1
+            }));
+            this.lastLocalUpdatedAt = updatedAtMs;
+            this.hasStoredLocalData = true;
             return true;
           } catch (error) {
-            console.error(
-              "Local save failed",
-              error
-            );
-
-            this.showToast(
-              "本機儲存失敗，請立即複製資料備份"
-            );
-
+            console.error('Local save failed', error);
+            this.showToast('本機儲存失敗，請立即複製資料備份');
             return false;
           }
         },
 
-        saveData(
-          action = "更新行程"
-        ) {
-          const updatedAtMs =
-            Date.now();
+        saveData(action = '更新行程') {
+          const updatedAtMs = Date.now();
 
-          if (
-            !this.saveLocalDataOnly(
-              updatedAtMs
-            )
-          ) {
-            return false;
-          }
+          if (!this.saveLocalDataOnly(updatedAtMs)) return false;
 
-          if (
-            this.firebaseUser &&
-            this.cloudSyncEnabled &&
-            !this.showCloudConflictModal
-          ) {
+          if (this.firebaseUser && this.cloudSyncEnabled && !this.showCloudConflictModal) {
             this.saveTripToCloud(action);
-          } else if (
-            !this.firebaseUser
-          ) {
-            this.syncStatus =
-              "只儲存在此裝置";
+          } else if (!this.firebaseUser) {
+            this.syncStatus = '只儲存在此裝置';
           }
 
           return true;
         },
 
         async reconcileCloudAndLocal() {
-          if (
-            !window.firebaseBridge ||
-            !this.firebaseUser ||
-            this.cloudBusy
-          ) {
-            return;
-          }
+          if (!window.firebaseBridge || !this.firebaseUser || this.cloudBusy) return;
 
-          const tripReference =
-            this.getCloudTripReference();
-
-          if (!tripReference) {
-            return;
-          }
+          const tripReference = this.getCloudTripReference();
+          if (!tripReference) return;
 
           this.cloudBusy = true;
           this.cloudSyncEnabled = false;
-
-          this.syncStatus =
-            navigator.onLine
-              ? "正在檢查雲端資料"
-              : "離線：等待檢查雲端資料";
+          this.syncStatus = navigator.onLine ? '正在檢查雲端資料' : '離線：等待檢查雲端資料';
 
           try {
-            const snapshot =
-              await window.firebaseBridge.getDoc(
-                tripReference
-              );
+            const snapshot = await window.firebaseBridge.getDoc(tripReference);
 
             if (!snapshot.exists()) {
               this.cloudSyncEnabled = true;
-
               this.startCloudListener();
-
-              this.saveTripToCloud(
-                "首次雲端備份"
-              );
-
+              this.saveTripToCloud('首次雲端備份');
               return;
             }
 
-            const cloudDocument =
-              snapshot.data();
-
-            const cloudTrip =
-              this.normaliseTripData(
-                cloudDocument.tripData
-              );
-
-            const cloudUpdatedAt =
-              this.getCloudUpdatedAt(
-                cloudDocument
-              );
+            const cloudDocument = snapshot.data();
+            const cloudTrip = this.normaliseTripData(cloudDocument.tripData);
+            const cloudUpdatedAt = this.getCloudUpdatedAt(cloudDocument);
 
             if (!this.hasStoredLocalData) {
-              this.applyCloudTrip(
-                cloudTrip,
-                cloudUpdatedAt
-              );
-
+              this.applyCloudTrip(cloudTrip, cloudUpdatedAt);
               this.cloudSyncEnabled = true;
-
               this.startCloudListener();
-
-              this.syncStatus =
-                snapshot.metadata.fromCache
-                  ? "已載入離線雲端快取"
-                  : "已同步";
-
-              this.showToast(
-                "已從雲端載入行程資料"
-              );
-
+              this.syncStatus = snapshot.metadata.fromCache ? '已載入離線雲端快取' : '已同步';
+              this.showToast('已從雲端載入行程資料');
               return;
             }
 
-            if (
-              this.tripsAreEqual(
-                this.trip,
-                cloudTrip
-              )
-            ) {
-              if (
-                cloudUpdatedAt >
-                this.lastLocalUpdatedAt
-              ) {
-                this.saveLocalDataOnly(
-                  cloudUpdatedAt
-                );
+            if (this.tripsAreEqual(this.trip, cloudTrip)) {
+              if (cloudUpdatedAt > this.lastLocalUpdatedAt) {
+                this.saveLocalDataOnly(cloudUpdatedAt);
               }
-
               this.cloudSyncEnabled = true;
-
               this.startCloudListener();
-
-              this.syncStatus =
-                snapshot.metadata.fromCache
-                  ? "已載入離線雲端快取"
-                  : "已同步";
-
+              this.syncStatus = snapshot.metadata.fromCache ? '已載入離線雲端快取' : '已同步';
               return;
             }
 
-            this.cloudConflictTrip =
-              cloudTrip;
-
-            this.cloudConflictUpdatedAt =
-              cloudUpdatedAt;
-
-            this.showCloudConflictModal =
-              true;
-
-            this.syncStatus =
-              "等待選擇版本";
+            this.cloudConflictTrip = cloudTrip;
+            this.cloudConflictUpdatedAt = cloudUpdatedAt;
+            this.showCloudConflictModal = true;
+            this.syncStatus = '等待選擇版本';
           } catch (error) {
-            console.error(
-              "Cloud reconciliation failed",
-              error
-            );
-
-            this.syncStatus =
-              navigator.onLine
-                ? "同步失敗；本機資料仍安全保存"
-                : "離線：資料已保存在本機";
+            console.error('Cloud reconciliation failed', error);
+            this.syncStatus = navigator.onLine
+              ? '同步失敗；本機資料仍安全保存'
+              : '離線：資料已保存在本機';
           } finally {
             this.cloudBusy = false;
           }
         },
 
-        applyCloudTrip(
-          cloudTrip,
-          cloudUpdatedAt = Date.now()
-        ) {
-          const previousTrip =
-            this.trip;
+        applyCloudTrip(cloudTrip, cloudUpdatedAt = Date.now()) {
+          const previousTrip = this.trip;
+          this.trip = this.normaliseTripData(cloudTrip);
 
-          this.trip =
-            this.normaliseTripData(
-              cloudTrip
-            );
-
-          if (
-            !this.saveLocalDataOnly(
-              cloudUpdatedAt ||
-              Date.now()
-            )
-          ) {
-            this.trip =
-              previousTrip;
-
+          if (!this.saveLocalDataOnly(cloudUpdatedAt || Date.now())) {
+            this.trip = previousTrip;
             return false;
           }
 
@@ -2149,70 +990,36 @@
         },
 
         async useCloudVersion() {
-          if (
-            !this.cloudConflictTrip ||
-            this.cloudBusy
-          ) {
-            return;
-          }
+          if (!this.cloudConflictTrip || this.cloudBusy) return;
 
           this.cloudBusy = true;
-
           try {
-            if (
-              !this.applyCloudTrip(
-                this.cloudConflictTrip,
-                this.cloudConflictUpdatedAt
-              )
-            ) {
-              return;
-            }
+            if (!this.applyCloudTrip(this.cloudConflictTrip, this.cloudConflictUpdatedAt)) return;
 
-            this.showCloudConflictModal =
-              false;
-
+            this.showCloudConflictModal = false;
             this.cloudConflictTrip = null;
             this.cloudConflictUpdatedAt = 0;
             this.pendingCloudTrip = null;
             this.pendingCloudUpdatedAt = 0;
             this.cloudSyncEnabled = true;
-
             this.startCloudListener();
-
-            this.syncStatus = "已同步";
-
-            this.showToast(
-              "已使用雲端版本"
-            );
+            this.syncStatus = '已同步';
+            this.showToast('已使用雲端版本');
           } finally {
             this.cloudBusy = false;
           }
         },
 
         async useLocalVersion() {
-          if (this.cloudBusy) {
-            return;
-          }
+          if (this.cloudBusy) return;
 
           this.cloudBusy = true;
-
           try {
-            this.showCloudConflictModal =
-              false;
-
+            this.showCloudConflictModal = false;
             this.cloudSyncEnabled = true;
-
             this.startCloudListener();
-
-            this.syncStatus =
-              navigator.onLine
-                ? "等待同步"
-                : "離線：等待同步";
-
-            this.saveTripToCloud(
-              "以本機版本覆蓋雲端"
-            );
-
+            this.syncStatus = navigator.onLine ? '等待同步' : '離線：等待同步';
+            this.saveTripToCloud('以本機版本覆蓋雲端');
             this.cloudConflictTrip = null;
             this.cloudConflictUpdatedAt = 0;
             this.pendingCloudTrip = null;
@@ -2223,1668 +1030,901 @@
         },
 
         pauseCloudSync() {
-          this.showCloudConflictModal =
-            false;
-
-          this.cloudSyncEnabled =
-            false;
-
-          this.cloudConflictTrip =
-            null;
-
-          this.cloudConflictUpdatedAt =
-            0;
-
-          this.pendingCloudTrip =
-            null;
-
-          this.pendingCloudUpdatedAt =
-            0;
-
-          this.syncStatus =
-            "同步已暫停；兩邊資料均未覆蓋";
+          this.showCloudConflictModal = false;
+          this.cloudSyncEnabled = false;
+          this.cloudConflictTrip = null;
+          this.cloudConflictUpdatedAt = 0;
+          this.pendingCloudTrip = null;
+          this.pendingCloudUpdatedAt = 0;
+          this.syncStatus = '同步已暫停；兩邊資料均未覆蓋';
         },
 
         async manualCloudSync() {
-          if (
-            !this.firebaseUser ||
-            this.cloudBusy
-          ) {
-            return;
-          }
+          if (!this.firebaseUser || this.cloudBusy) return;
 
           if (!this.cloudSyncEnabled) {
             await this.reconcileCloudAndLocal();
             return;
           }
 
-          this.saveTripToCloud(
-            "手動雲端備份"
-          );
+          this.saveTripToCloud('手動雲端備份');
         },
 
         async reviewLatestCloudData() {
-          if (
-            this.pendingCloudTrip &&
-            !this.cloudBusy
-          ) {
-            this.cloudConflictTrip =
-              this.pendingCloudTrip;
-
-            this.cloudConflictUpdatedAt =
-              this.pendingCloudUpdatedAt;
-
+          if (this.pendingCloudTrip && !this.cloudBusy) {
+            this.cloudConflictTrip = this.pendingCloudTrip;
+            this.cloudConflictUpdatedAt = this.pendingCloudUpdatedAt;
             this.pendingCloudTrip = null;
             this.pendingCloudUpdatedAt = 0;
-
-            this.showCloudConflictModal =
-              true;
-
-            this.syncStatus =
-              "等待選擇版本";
-
+            this.showCloudConflictModal = true;
+            this.syncStatus = '等待選擇版本';
             return;
           }
 
-          if (
-            !window.firebaseBridge ||
-            !this.firebaseUser ||
-            this.cloudBusy
-          ) {
-            return;
-          }
+          if (!window.firebaseBridge || !this.firebaseUser || this.cloudBusy) return;
 
-          const tripReference =
-            this.getCloudTripReference();
-
-          if (!tripReference) {
-            return;
-          }
+          const tripReference = this.getCloudTripReference();
+          if (!tripReference) return;
 
           this.cloudBusy = true;
-
           try {
-            const snapshot =
-              await window.firebaseBridge.getDoc(
-                tripReference
-              );
-
+            const snapshot = await window.firebaseBridge.getDoc(tripReference);
             if (!snapshot.exists()) {
-              this.showToast(
-                "雲端尚未有資料"
-              );
-
+              this.showToast('雲端尚未有資料');
               return;
             }
 
-            const cloudDocument =
-              snapshot.data();
+            const cloudDocument = snapshot.data();
+            const cloudTrip = this.normaliseTripData(cloudDocument.tripData);
 
-            const cloudTrip =
-              this.normaliseTripData(
-                cloudDocument.tripData
-              );
-
-            if (
-              this.tripsAreEqual(
-                this.trip,
-                cloudTrip
-              )
-            ) {
-              this.syncStatus =
-                "已同步";
-
-              this.showToast(
-                "本機與雲端資料一致"
-              );
-
+            if (this.tripsAreEqual(this.trip, cloudTrip)) {
+              this.syncStatus = '已同步';
+              this.showToast('本機與雲端資料一致');
               return;
             }
 
-            this.cloudConflictTrip =
-              cloudTrip;
-
-            this.cloudConflictUpdatedAt =
-              this.getCloudUpdatedAt(
-                cloudDocument
-              );
-
-            this.showCloudConflictModal =
-              true;
-
-            this.syncStatus =
-              "等待選擇版本";
+            this.cloudConflictTrip = cloudTrip;
+            this.cloudConflictUpdatedAt = this.getCloudUpdatedAt(cloudDocument);
+            this.showCloudConflictModal = true;
+            this.syncStatus = '等待選擇版本';
           } catch (error) {
-            console.error(
-              "Cloud refresh failed",
-              error
-            );
-
-            this.showToast(
-              "無法讀取最新雲端資料"
-            );
+            console.error('Cloud refresh failed', error);
+            this.showToast('無法讀取最新雲端資料');
           } finally {
             this.cloudBusy = false;
           }
         },
 
         startCloudListener() {
-          if (
-            !window.firebaseBridge ||
-            !this.firebaseUser
-          ) {
-            return;
-          }
+          if (!window.firebaseBridge || !this.firebaseUser) return;
 
-          const tripReference =
-            this.getCloudTripReference();
+          const tripReference = this.getCloudTripReference();
+          if (!tripReference) return;
 
-          if (!tripReference) {
-            return;
-          }
+          if (this.cloudUnsubscribe) this.cloudUnsubscribe();
 
-          if (this.cloudUnsubscribe) {
-            this.cloudUnsubscribe();
-          }
+          this.cloudUnsubscribe = window.firebaseBridge.onSnapshot(
+            tripReference,
+            { includeMetadataChanges: true },
+            (snapshot) => {
+              if (!snapshot.exists()) return;
 
-          this.cloudUnsubscribe =
-            window.firebaseBridge.onSnapshot(
-              tripReference,
+              if (snapshot.metadata.hasPendingWrites) {
+                this.syncStatus = navigator.onLine ? '等待同步' : '離線：等待同步';
+                return;
+              }
 
-              {
-                includeMetadataChanges: true
-              },
+              const cloudDocument = snapshot.data();
+              const cloudTrip = this.normaliseTripData(cloudDocument.tripData);
+              const cloudUpdatedAt = this.getCloudUpdatedAt(cloudDocument);
 
-              (snapshot) => {
-                if (!snapshot.exists()) {
-                  return;
+              if (this.tripsAreEqual(this.trip, cloudTrip)) {
+                this.syncStatus = navigator.onLine ? '已同步' : '已保存在離線快取';
+                if (cloudUpdatedAt > this.lastLocalUpdatedAt) {
+                  this.saveLocalDataOnly(cloudUpdatedAt);
                 }
-
-                if (
-                  snapshot.metadata
-                    .hasPendingWrites
-                ) {
-                  this.syncStatus =
-                    navigator.onLine
-                      ? "等待同步"
-                      : "離線：等待同步";
-
-                  return;
-                }
-
-                const cloudDocument =
-                  snapshot.data();
-
-                const cloudTrip =
-                  this.normaliseTripData(
-                    cloudDocument.tripData
-                  );
-
-                const cloudUpdatedAt =
-                  this.getCloudUpdatedAt(
-                    cloudDocument
-                  );
-
-                if (
-                  this.tripsAreEqual(
-                    this.trip,
-                    cloudTrip
-                  )
-                ) {
-                  this.syncStatus =
-                    navigator.onLine
-                      ? "已同步"
-                      : "已保存在離線快取";
-
-                  if (
-                    cloudUpdatedAt >
-                    this.lastLocalUpdatedAt
-                  ) {
-                    this.saveLocalDataOnly(
-                      cloudUpdatedAt
-                    );
-                  }
-
-                  return;
-                }
-
-                this.pendingCloudTrip =
-                  cloudTrip;
-
-                this.pendingCloudUpdatedAt =
-                  cloudUpdatedAt;
-
-                this.cloudSyncEnabled =
-                  false;
-
-                this.syncStatus =
-                  "雲端有較新資料";
-              },
-
-              (error) => {
-                console.error(
-                  "Cloud listener failed",
-                  error
-                );
-
-                this.syncStatus =
-                  "同步失敗；本機資料仍安全保存";
+                return;
               }
-            );
-        },
 
-        saveTripToCloud(
-          action = "更新行程"
-        ) {
-          if (
-            !window.firebaseBridge ||
-            !this.firebaseUser ||
-            !this.cloudSyncEnabled
-          ) {
-            return;
-          }
-
-          const firebase =
-            window.firebaseBridge;
-
-          const user =
-            firebase.auth.currentUser;
-
-          const tripReference =
-            this.getCloudTripReference();
-
-          if (!user || !tripReference) {
-            return;
-          }
-
-          this.syncStatus =
-            navigator.onLine
-              ? "等待同步"
-              : "離線：等待同步";
-
-          try {
-            const revisionReference =
-              firebase.doc(
-                firebase.collection(
-                  tripReference,
-                  "revisions"
-                )
-              );
-
-            const batch =
-              firebase.writeBatch(
-                firebase.db
-              );
-
-            const tripData =
-              JSON.parse(
-                JSON.stringify(
-                  this.trip
-                )
-              );
-
-            const clientUpdatedAtMs =
-              this.lastLocalUpdatedAt ||
-              Date.now();
-
-            batch.set(
-              tripReference,
-              {
-                tripData,
-
-                updatedAt:
-                  firebase.serverTimestamp(),
-
-                clientUpdatedAtMs,
-
-                updatedBy:
-                  user.uid,
-
-                schemaVersion: 1
-              },
-
-              {
-                merge: true
-              }
-            );
-
-            batch.set(
-              revisionReference,
-              {
-                action,
-                tripData,
-
-                savedAt:
-                  firebase.serverTimestamp(),
-
-                clientSavedAtMs:
-                  clientUpdatedAtMs,
-
-                savedBy:
-                  user.uid,
-
-                schemaVersion: 1
-              }
-            );
-
-            batch.commit().catch(
-              (error) => {
-                console.error(
-                  "Cloud save failed",
-                  error
-                );
-
-                this.syncStatus =
-                  navigator.onLine
-                    ? "同步失敗；本機資料仍安全保存"
-                    : "離線：等待同步";
-              }
-            );
-          } catch (error) {
-            console.error(
-              "Cloud save preparation failed",
-              error
-            );
-
-            this.syncStatus =
-              "同步失敗；本機資料仍安全保存";
-          }
-        },
-
-        showToast(message) {
-          this.toast.message = message;
-          this.toast.show = true;
-
-          setTimeout(() => {
-            this.toast.show = false;
-          }, 2500);
-        },
-
-        formatNumber(value) {
-          return (
-            Number(value) || 0
-          ).toLocaleString(
-            "en-US",
-            {
-              minimumFractionDigits: 1,
-              maximumFractionDigits: 1
+              this.pendingCloudTrip = cloudTrip;
+              this.pendingCloudUpdatedAt = cloudUpdatedAt;
+              this.cloudSyncEnabled = false;
+              this.syncStatus = '雲端有較新資料';
+            },
+            (error) => {
+              console.error('Cloud listener failed', error);
+              this.syncStatus = '同步失敗；本機資料仍安全保存';
             }
           );
         },
 
-        convertToBase(
-          amount,
-          currency
-        ) {
-          const rateFrom =
-            this.ratesToHKD[currency] ||
-            1;
+        saveTripToCloud(action = '更新行程') {
+          if (!window.firebaseBridge || !this.firebaseUser || !this.cloudSyncEnabled) return;
 
-          const rateBase =
-            this.ratesToHKD[
-              this.trip.baseCurrency
-            ] || 1;
+          const firebase = window.firebaseBridge;
+          const user = firebase.auth.currentUser;
+          const tripReference = this.getCloudTripReference();
+          if (!user || !tripReference) return;
 
-          return (
-            Number(amount) *
-            rateFrom
-          ) / rateBase;
+          this.syncStatus = navigator.onLine ? '等待同步' : '離線：等待同步';
+
+          try {
+            const revisionReference = firebase.doc(firebase.collection(tripReference, 'revisions'));
+            const batch = firebase.writeBatch(firebase.db);
+            const tripData = JSON.parse(JSON.stringify(this.trip));
+            const clientUpdatedAtMs = this.lastLocalUpdatedAt || Date.now();
+
+            batch.set(tripReference, {
+              tripData,
+              updatedAt: firebase.serverTimestamp(),
+              clientUpdatedAtMs,
+              updatedBy: user.uid,
+              schemaVersion: 1
+            }, { merge: true });
+
+            batch.set(revisionReference, {
+              action,
+              tripData,
+              savedAt: firebase.serverTimestamp(),
+              clientSavedAtMs: clientUpdatedAtMs,
+              savedBy: user.uid,
+              schemaVersion: 1
+            });
+
+            batch.commit().catch((error) => {
+              console.error('Cloud save failed', error);
+              this.syncStatus = navigator.onLine
+                ? '同步失敗；本機資料仍安全保存'
+                : '離線：等待同步';
+            });
+          } catch (error) {
+            console.error('Cloud save preparation failed', error);
+            this.syncStatus = '同步失敗；本機資料仍安全保存';
+          }
+        },
+
+        showToast(msg) {
+          this.toast.message = msg;
+          this.toast.show = true;
+          setTimeout(() => { this.toast.show = false; }, 2500);
+        },
+
+        formatNumber(val) {
+          return (Number(val) || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        },
+
+        convertToBase(amount, currency) {
+          const rateFrom = this.ratesToHKD[currency] || 1;
+          const rateBase = this.ratesToHKD[this.trip.baseCurrency] || 1;
+          return (amount * rateFrom) / rateBase;
         },
 
         calculateTotalTripBase() {
-          return this.trip.expenses.reduce(
-            (sum, expense) => {
-              return (
-                sum +
-                this.convertToBase(
-                  expense.amount,
-                  expense.currency
-                )
-              );
-            },
-            0
-          );
+          return this.trip.expenses.reduce((sum, exp) => sum + this.convertToBase(exp.amount, exp.currency), 0);
         },
 
-        getCategoryEmoji(category) {
-          const map = {
-            餐飲: "🍱",
-            住宿: "🏨",
-            交通: "🚗",
-            購物: "🛍️",
-            娛樂: "🎟️",
-            其他: "💡"
-          };
-
-          return map[category] || "💡";
+        getCategoryEmoji(cat) {
+          const map = { '餐飲': '🍱', '住宿': '🏨', '交通': '🚗', '購物': '🛍️', '娛樂': '🎟️', '其他': '💡' };
+          return map[cat] || '💡';
         },
 
-        hasCustomShares(expense) {
-          if (!expense.customShares) {
-            return false;
-          }
-
-          return Object
-            .values(
-              expense.customShares
-            )
-            .some((value) => {
-              return (
-                value !== null &&
-                value !== "" &&
-                !Number.isNaN(
-                  Number(value)
-                ) &&
-                Number(value) > 0
-              );
-            });
+        hasCustomShares(exp) {
+          if (!exp.customShares) return false;
+          return Object.values(exp.customShares).some(v => v !== null && v !== '' && !isNaN(v) && Number(v) > 0);
         },
 
         openSyncModal() {
-          this.importCodeInput = "";
+          this.importCodeInput = '';
           this.showSyncModal = true;
         },
 
         generateShareLink() {
           try {
-            const jsonString =
-              JSON.stringify(this.trip);
-
-            const encoded =
-              btoa(
-                encodeURIComponent(
-                  jsonString
-                )
-              );
-
-            const shareUrl =
-              window.location.origin +
-              window.location.pathname +
-              "?data=" +
-              encoded;
-
-            navigator.clipboard.writeText(
-              shareUrl
-            );
-
-            this.showToast(
-              "已複製同步網址！傳給朋友點開即可載入"
-            );
-          } catch (error) {
-            console.error(
-              "Share link generation failed",
-              error
-            );
-
-            this.showToast(
-              "產生網址失敗，請嘗試複製代碼"
-            );
+            const jsonStr = JSON.stringify(this.trip);
+            const encoded = btoa(encodeURIComponent(jsonStr));
+            const shareUrl = window.location.origin + window.location.pathname + '?data=' + encoded;
+            navigator.clipboard.writeText(shareUrl);
+            this.showToast('已複製同步網址！傳給朋友點開即可載入');
+          } catch (e) {
+            this.showToast('產生網址失敗，請嘗試複製代碼');
           }
         },
 
         exportDataCode() {
           try {
-            const jsonString =
-              JSON.stringify(this.trip);
-
-            navigator.clipboard.writeText(
-              jsonString
-            );
-
-            this.showToast(
-              "已複製資料代碼到剪貼簿！"
-            );
-          } catch (error) {
-            console.error(
-              "Copy failed",
-              error
-            );
-
-            this.showToast(
-              "複製失敗"
-            );
+            const jsonStr = JSON.stringify(this.trip);
+            navigator.clipboard.writeText(jsonStr);
+            this.showToast('已複製資料代碼到剪貼簿！');
+          } catch (e) {
+            this.showToast('複製失敗');
           }
         },
 
         importDataCode() {
-          if (
-            !this.importCodeInput.trim()
-          ) {
-            return this.showToast(
-              "請先貼上資料代碼"
-            );
-          }
-
+          if (!this.importCodeInput.trim()) return this.showToast('請先貼上資料代碼');
           try {
-            const parsed = JSON.parse(
-              this.importCodeInput.trim()
-            );
-
-            if (
-              parsed &&
-              parsed.name &&
-              Array.isArray(
-                parsed.members
-              )
-            ) {
-              const previousTrip =
-                this.trip;
-
+            const parsed = JSON.parse(this.importCodeInput.trim());
+            if (parsed && parsed.name && Array.isArray(parsed.members)) {
+              const previousTrip = this.trip;
               this.trip = parsed;
-
-              if (
-                !this.saveData(
-                  "匯入文字備份"
-                )
-              ) {
-                this.trip =
-                  previousTrip;
-
+              if (!this.saveData('匯入文字備份')) {
+                this.trip = previousTrip;
                 return;
               }
-
-              this.showSyncModal =
-                false;
-
-              this.showToast(
-                "成功匯入並覆蓋資料！"
-              );
+              this.showSyncModal = false;
+              this.showToast('成功匯入並覆蓋資料！');
             } else {
-              this.showToast(
-                "資料格式不正確"
-              );
+              this.showToast('資料格式不正確');
             }
-          } catch (error) {
-            console.error(
-              "Import failed",
-              error
-            );
-
-            this.showToast(
-              "無效的代碼格式"
-            );
+          } catch (e) {
+            this.showToast('無效的代碼格式');
           }
         },
 
         get memberBalances() {
           const balances = {};
+          this.trip.members.forEach(m => balances[m] = 0);
 
-          this.trip.members.forEach(
-            (member) => {
-              balances[member] = 0;
-            }
-          );
+          this.trip.expenses.forEach(exp => {
+            const totalAmountBase = this.convertToBase(exp.amount, exp.currency);
+            const participants = exp.participants || [];
+            if (participants.length === 0) return;
 
-          this.trip.expenses.forEach(
-            (expense) => {
-              const totalAmountBase =
-                this.convertToBase(
-                  expense.amount,
-                  expense.currency
-                );
+            const customShares = exp.customShares || {};
+            let customSum = 0;
+            let unassignedCount = 0;
 
-              const participants =
-                expense.participants ||
-                [];
-
-              if (
-                participants.length === 0
-              ) {
-                return;
+            participants.forEach(p => {
+              const val = Number(customShares[p]);
+              if (!isNaN(val) && val > 0) {
+                customSum += val;
+              } else {
+                unassignedCount++;
               }
+            });
 
-              const customShares =
-                expense.customShares ||
-                {};
+            const remaining = Math.max(0, exp.amount - customSum);
+            const autoShare = unassignedCount > 0 ? remaining / unassignedCount : 0;
 
-              let customSum = 0;
-              let unassignedCount = 0;
+            participants.forEach(p => {
+              const val = Number(customShares[p]);
+              const pShareCurr = (!isNaN(val) && val > 0) ? val : autoShare;
+              const pShareBase = this.convertToBase(pShareCurr, exp.currency);
 
-              participants.forEach(
-                (participant) => {
-                  const value =
-                    Number(
-                      customShares[
-                        participant
-                      ]
-                    );
-
-                  if (
-                    !Number.isNaN(value) &&
-                    value > 0
-                  ) {
-                    customSum += value;
-                  } else {
-                    unassignedCount += 1;
-                  }
-                }
-              );
-
-              const remaining =
-                Math.max(
-                  0,
-                  Number(
-                    expense.amount
-                  ) -
-                  customSum
-                );
-
-              const autoShare =
-                unassignedCount > 0
-                  ? remaining /
-                    unassignedCount
-                  : 0;
-
-              participants.forEach(
-                (participant) => {
-                  const value =
-                    Number(
-                      customShares[
-                        participant
-                      ]
-                    );
-
-                  const participantShareCurrency =
-                    !Number.isNaN(value) &&
-                    value > 0
-                      ? value
-                      : autoShare;
-
-                  const participantShareBase =
-                    this.convertToBase(
-                      participantShareCurrency,
-                      expense.currency
-                    );
-
-                  if (
-                    balances[
-                      participant
-                    ] !== undefined
-                  ) {
-                    balances[
-                      participant
-                    ] -=
-                      participantShareBase;
-                  }
-                }
-              );
-
-              if (
-                balances[
-                  expense.payer
-                ] !== undefined
-              ) {
-                balances[
-                  expense.payer
-                ] +=
-                  totalAmountBase;
+              if (balances[p] !== undefined) {
+                balances[p] -= pShareBase;
               }
-            }
-          );
+            });
 
-          return Object
-            .keys(balances)
-            .map((name) => ({
-              name,
-              net: balances[name]
-            }));
+            if (balances[exp.payer] !== undefined) {
+              balances[exp.payer] += totalAmountBase;
+            }
+          });
+
+          return Object.keys(balances).map(name => ({ name, net: balances[name] }));
         },
 
         get settlementPlan() {
-          const people =
-            this.memberBalances
-              .map((member) => ({
-                name: member.name,
-                amount: Math.round(
-                  member.net * 100
-                )
-              }))
-              .filter((member) => {
-                return member.amount !== 0;
-              });
+          const people = this.memberBalances
+            .map(m => ({ name: m.name, amount: Math.round(m.net * 100) }))
+            .filter(m => m.amount !== 0);
 
-          if (people.length === 0) {
-            return [];
-          }
+          if (people.length === 0) return [];
 
-          const names =
-            people.map(
-              (person) => person.name
-            );
-
-          const initialBalances =
-            people.map(
-              (person) => person.amount
-            );
-
-          const roundingDifference =
-            initialBalances.reduce(
-              (sum, amount) => {
-                return sum + amount;
-              },
+          const names = people.map(p => p.name);
+          const initialBalances = people.map(p => p.amount);
+          const roundingDifference = initialBalances.reduce((sum, amount) => sum + amount, 0);
+          if (roundingDifference !== 0) {
+            const adjustmentIndex = initialBalances.reduce(
+              (largest, amount, idx, arr) => Math.abs(amount) > Math.abs(arr[largest]) ? idx : largest,
               0
             );
-
-          if (
-            roundingDifference !== 0
-          ) {
-            const adjustmentIndex =
-              initialBalances.reduce(
-                (
-                  largestIndex,
-                  amount,
-                  currentIndex,
-                  array
-                ) => {
-                  return (
-                    Math.abs(amount) >
-                    Math.abs(
-                      array[
-                        largestIndex
-                      ]
-                    )
-                  )
-                    ? currentIndex
-                    : largestIndex;
-                },
-                0
-              );
-
-            initialBalances[
-              adjustmentIndex
-            ] -= roundingDifference;
+            initialBalances[adjustmentIndex] -= roundingDifference;
           }
+          const memo = new Map();
 
-          const memo =
-            new Map();
+          const solve = (balances) => {
+            const first = balances.findIndex(amount => amount !== 0);
+            if (first === -1) return [];
 
-          const solve =
-            (balances) => {
-              const firstIndex =
-                balances.findIndex(
-                  (amount) => {
-                    return amount !== 0;
-                  }
-                );
+            const key = balances.join(',');
+            if (memo.has(key)) return memo.get(key);
 
-              if (firstIndex === -1) {
-                return [];
+            let bestPlan = null;
+            const triedCounterpartyBalances = new Set();
+
+            for (let i = first + 1; i < balances.length; i++) {
+              if (balances[first] * balances[i] >= 0) continue;
+              if (triedCounterpartyBalances.has(balances[i])) continue;
+              triedCounterpartyBalances.add(balances[i]);
+
+              const next = [...balances];
+              const transfer = Math.min(Math.abs(next[first]), Math.abs(next[i]));
+              const transaction = next[first] < 0
+                ? { from: names[first], to: names[i], amount: transfer / 100 }
+                : { from: names[i], to: names[first], amount: transfer / 100 };
+
+              next[first] += next[first] < 0 ? transfer : -transfer;
+              next[i] += next[i] < 0 ? transfer : -transfer;
+
+              const remainder = solve(next);
+              if (remainder !== null) {
+                const candidate = [transaction, ...remainder];
+                if (!bestPlan || candidate.length < bestPlan.length) bestPlan = candidate;
               }
 
-              const memoKey =
-                balances.join(",");
+              if (Math.abs(balances[first]) === Math.abs(balances[i])) break;
+            }
 
-              if (memo.has(memoKey)) {
-                return memo.get(
-                  memoKey
-                );
-              }
+            memo.set(key, bestPlan);
+            return bestPlan;
+          };
 
-              let bestPlan = null;
-
-              const triedCounterpartyBalances =
-                new Set();
-
-              for (
-                let index =
-                  firstIndex + 1;
-
-                index <
-                  balances.length;
-
-                index += 1
-              ) {
-                if (
-                  balances[
-                    firstIndex
-                  ] *
-                  balances[index] >=
-                  0
-                ) {
-                  continue;
-                }
-
-                if (
-                  triedCounterpartyBalances.has(
-                    balances[index]
-                  )
-                ) {
-                  continue;
-                }
-
-                triedCounterpartyBalances.add(
-                  balances[index]
-                );
-
-                const nextBalances =
-                  [
-                    ...balances
-                  ];
-
-                const transferAmount =
-                  Math.min(
-                    Math.abs(
-                      nextBalances[
-                        firstIndex
-                      ]
-                    ),
-                    Math.abs(
-                      nextBalances[
-                        index
-                      ]
-                    )
-                  );
-
-                const transaction =
-                  nextBalances[
-                    firstIndex
-                  ] < 0
-                    ? {
-                        from:
-                          names[
-                            firstIndex
-                          ],
-
-                        to:
-                          names[index],
-
-                        amount:
-                          transferAmount /
-                          100
-                      }
-                    : {
-                        from:
-                          names[index],
-
-                        to:
-                          names[
-                            firstIndex
-                          ],
-
-                        amount:
-                          transferAmount /
-                          100
-                      };
-
-                nextBalances[
-                  firstIndex
-                ] +=
-                  nextBalances[
-                    firstIndex
-                  ] < 0
-                    ? transferAmount
-                    : -transferAmount;
-
-                nextBalances[
-                  index
-                ] +=
-                  nextBalances[
-                    index
-                  ] < 0
-                    ? transferAmount
-                    : -transferAmount;
-
-                const remainder =
-                  solve(nextBalances);
-
-                if (
-                  remainder !== null
-                ) {
-                  const candidate = [
-                    transaction,
-                    ...remainder
-                  ];
-
-                  if (
-                    !bestPlan ||
-                    candidate.length <
-                    bestPlan.length
-                  ) {
-                    bestPlan =
-                      candidate;
-                  }
-                }
-
-                if (
-                  Math.abs(
-                    balances[
-                      firstIndex
-                    ]
-                  ) ===
-                  Math.abs(
-                    balances[index]
-                  )
-                ) {
-                  break;
-                }
-              }
-
-              memo.set(
-                memoKey,
-                bestPlan
-              );
-
-              return bestPlan;
-            };
-
-          return (
-            solve(
-              initialBalances
-            ) || []
-          );
+          return solve(initialBalances) || [];
         },
 
-        openExpenseModal(
-          expense = null
-        ) {
-          if (expense) {
-            this.formExpense =
-              JSON.parse(
-                JSON.stringify(
-                  expense
-                )
-              );
+        openExpenseModal(exp = null) {
+          this.aiReviewMessage = '';
 
-            if (
-              !this.formExpense
-                .customShares
-            ) {
-              this.formExpense
-                .customShares = {};
-            }
+          if (exp) {
+            this.formExpense = JSON.parse(JSON.stringify(exp));
+            if (!this.formExpense.customShares) this.formExpense.customShares = {};
           } else {
             this.formExpense = {
-              id: null,
-              title: "",
-              amount: "",
-              currency:
-                this.trip.baseCurrency,
-              payer:
-                this.trip.members[0] ||
-                "",
-              category: "餐飲",
-              participants: [
-                ...this.trip.members
-              ],
-              customShares: {}
+              id: null, title: '', amount: '', currency: this.trip.baseCurrency,
+              payer: this.trip.members[0] || '', category: '餐飲',
+              participants: [...this.trip.members], customShares: {}
             };
           }
-
-          this.showExpenseModal =
-            true;
+          this.showExpenseModal = true;
         },
 
         saveExpense() {
-          if (
-            !this.formExpense.title.trim() ||
-            !this.formExpense.amount ||
-            this.formExpense.amount <= 0
-          ) {
-            return this.showToast(
-              "請填寫有效名稱與金額"
-            );
-          }
-
-          if (
-            this.formExpense
-              .participants.length === 0
-          ) {
-            return this.showToast(
-              "請選擇參與拆帳成員"
-            );
-          }
+          if (!this.formExpense.title.trim() || !this.formExpense.amount || this.formExpense.amount <= 0) return this.showToast('請填寫有效名稱與金額');
+          if (this.formExpense.participants.length === 0) return this.showToast('請選擇參與拆帳成員');
 
           const cleanedShares = {};
-
-          this.formExpense
-            .participants
-            .forEach(
-              (participant) => {
-                if (
-                  this.formExpense
-                    .customShares[
-                      participant
-                    ]
-                ) {
-                  cleanedShares[
-                    participant
-                  ] =
-                    this.formExpense
-                      .customShares[
-                        participant
-                      ];
-                }
-              }
-            );
-
-          this.formExpense
-            .customShares =
-              cleanedShares;
-
-          const previousExpenses =
-            JSON.parse(
-              JSON.stringify(
-                this.trip.expenses
-              )
-            );
-
-          const isEditing =
-            Boolean(
-              this.formExpense.id
-            );
-
-          if (isEditing) {
-            const index =
-              this.trip.expenses
-                .findIndex(
-                  (expense) => {
-                    return (
-                      expense.id ===
-                      this.formExpense.id
-                    );
-                  }
-                );
-
-            if (index !== -1) {
-              this.trip.expenses[
-                index
-              ] = {
-                ...this.formExpense
-              };
+          this.formExpense.participants.forEach(p => {
+            if (this.formExpense.customShares[p]) {
+              cleanedShares[p] = this.formExpense.customShares[p];
             }
-          } else {
-            const newExpense = {
-              ...this.formExpense,
-              id:
-                Date.now().toString()
-            };
+          });
+          this.formExpense.customShares = cleanedShares;
 
-            this.trip.expenses.unshift(
-              newExpense
-            );
+          const previousExpenses = JSON.parse(JSON.stringify(this.trip.expenses));
+          if (this.formExpense.id) {
+            const idx = this.trip.expenses.findIndex(e => e.id === this.formExpense.id);
+            if (idx !== -1) this.trip.expenses[idx] = { ...this.formExpense };
+          } else {
+            const newExpense = { ...this.formExpense, id: Date.now().toString() };
+            this.trip.expenses.unshift(newExpense);
           }
 
-          if (
-            !this.saveData(
-              isEditing
-                ? "修改消費"
-                : "新增消費"
-            )
-          ) {
-            this.trip.expenses =
-              previousExpenses;
-
+          if (!this.saveData(this.formExpense.id ? '修改消費' : '新增消費')) {
+            this.trip.expenses = previousExpenses;
             return;
           }
-
-          this.showExpenseModal =
-            false;
-
-          this.showToast(
-            "消費紀錄已儲存"
-          );
+          this.showExpenseModal = false;
+          this.showToast('消費紀錄已儲存');
         },
 
         deleteExpense(id) {
-          const index =
-            this.trip.expenses
-              .findIndex(
-                (expense) => {
-                  return expense.id === id;
-                }
-              );
+          const index = this.trip.expenses.findIndex(e => e.id === id);
+          if (index === -1) return;
 
-          if (index === -1) {
+          const expense = this.trip.expenses[index];
+          if (!window.confirm(`確定刪除「${expense.title}」？刪除後可在 5 秒內復原。`)) return;
+
+          const previousExpenses = JSON.parse(JSON.stringify(this.trip.expenses));
+          this.trip.expenses.splice(index, 1);
+          if (!this.saveData('刪除消費')) {
+            this.trip.expenses = previousExpenses;
             return;
           }
 
-          const expense =
-            this.trip.expenses[
-              index
-            ];
-
-          const confirmed =
-            window.confirm(
-              `確定刪除「${expense.title}」？刪除後可在 5 秒內復原。`
-            );
-
-          if (!confirmed) {
-            return;
-          }
-
-          const previousExpenses =
-            JSON.parse(
-              JSON.stringify(
-                this.trip.expenses
-              )
-            );
-
-          this.trip.expenses.splice(
-            index,
-            1
-          );
-
-          if (
-            !this.saveData(
-              "刪除消費"
-            )
-          ) {
-            this.trip.expenses =
-              previousExpenses;
-
-            return;
-          }
-
-          if (
-            this.undoDelete.timer
-          ) {
-            clearTimeout(
-              this.undoDelete.timer
-            );
-          }
-
+          if (this.undoDelete.timer) clearTimeout(this.undoDelete.timer);
           this.toast.show = false;
-
-          this.undoDelete = {
-            show: true,
-            expense,
-            index,
-            timer: null
-          };
-
-          this.undoDelete.timer =
-            setTimeout(() => {
-              this.undoDelete.show =
-                false;
-
-              this.undoDelete.expense =
-                null;
-
-              this.undoDelete.index =
-                -1;
-
-              this.undoDelete.timer =
-                null;
-            }, 5000);
+          this.undoDelete = { show: true, expense, index, timer: null };
+          this.undoDelete.timer = setTimeout(() => {
+            this.undoDelete.show = false;
+            this.undoDelete.expense = null;
+            this.undoDelete.index = -1;
+            this.undoDelete.timer = null;
+          }, 5000);
         },
 
         undoDeleteExpense() {
-          if (
-            !this.undoDelete.expense
-          ) {
+          if (!this.undoDelete.expense) return;
+
+          const restoreIndex = Math.min(this.undoDelete.index, this.trip.expenses.length);
+          this.trip.expenses.splice(restoreIndex, 0, this.undoDelete.expense);
+          if (!this.saveData('復原已刪除消費')) {
+            this.trip.expenses.splice(restoreIndex, 1);
             return;
           }
 
-          const restoreIndex =
-            Math.min(
-              this.undoDelete.index,
-              this.trip.expenses.length
-            );
-
-          this.trip.expenses.splice(
-            restoreIndex,
-            0,
-            this.undoDelete.expense
-          );
-
-          if (
-            !this.saveData(
-              "復原已刪除消費"
-            )
-          ) {
-            this.trip.expenses.splice(
-              restoreIndex,
-              1
-            );
-
-            return;
-          }
-
-          if (
-            this.undoDelete.timer
-          ) {
-            clearTimeout(
-              this.undoDelete.timer
-            );
-          }
-
-          this.undoDelete = {
-            show: false,
-            expense: null,
-            index: -1,
-            timer: null
-          };
-
-          this.showToast(
-            "已復原消費紀錄"
-          );
+          if (this.undoDelete.timer) clearTimeout(this.undoDelete.timer);
+          this.undoDelete = { show: false, expense: null, index: -1, timer: null };
+          this.showToast('已復原消費紀錄');
         },
 
-        triggerPhotoScan() {
-          document
-            .getElementById(
-              "receiptInput"
-            )
-            .click();
-        },
+        triggerPhotoScan() { document.getElementById('receiptInput').click(); },
 
-        handleReceiptUpload(event) {
-          const file =
-            event.target.files[0];
+        handleReceiptUpload(e) {
+          const file = e.target.files[0];
+          if (!file) return;
 
-          if (!file) {
-            return;
+          const supportedTypes = [
+            'image/jpeg',
+            'image/png',
+            'image/webp'
+          ];
+
+          if (!supportedTypes.includes(file.type)) {
+            e.target.value = '';
+            this.receiptImage = null;
+            this.receiptBase64 = null;
+            this.receiptMimeType = '';
+            return this.showToast('只支援 JPEG、PNG 或 WebP；iPhone HEIC 相片請先截圖再上傳');
           }
 
-          const maxFileSize =
-            10 * 1024 * 1024;
-
-          if (
-            file.size >
-            maxFileSize
-          ) {
-            event.target.value = "";
-
-            return this.showToast(
-              "圖片太大，請選擇 10 MB 或以下的圖片"
-            );
+          const maxFileSize = 10 * 1024 * 1024;
+          if (file.size > maxFileSize) {
+            e.target.value = '';
+            return this.showToast('圖片太大，請選擇 10 MB 或以下的圖片');
           }
 
-          const reader =
-            new FileReader();
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            const dataUrl = String(evt.target.result || '');
+            const base64 = dataUrl.split(',')[1] || '';
 
-          reader.onload =
-            (loadEvent) => {
-              this.receiptImage =
-                loadEvent.target.result;
+            if (!base64) {
+              return this.showToast('圖片內容無法讀取，請重新選擇');
+            }
 
-              this.receiptBase64 =
-                loadEvent.target.result
-                  .split(",")[1];
-
-              this.activeTab = "ai";
-
-              this.showToast(
-                "相片已載入"
-              );
-            };
-
-          reader.onerror = () => {
-            this.showToast(
-              "圖片讀取失敗，請重新選擇"
-            );
+            this.receiptImage = dataUrl;
+            this.receiptBase64 = base64;
+            this.receiptMimeType = file.type;
+            this.activeTab = 'ai';
+            this.showToast('相片已載入');
           };
-
+          reader.onerror = () => this.showToast('圖片讀取失敗，請重新選擇');
           reader.readAsDataURL(file);
         },
 
-        analyzeReceiptWithAI() {
-          if (
-            !this.receiptBase64
-          ) {
-            return this.showToast(
-              "請先拍攝或選擇照片"
-            );
+        getAIErrorMessage(error) {
+          const code = String(error?.code || '').toLowerCase();
+          const message = String(error?.message || '').toLowerCase();
+          const combined = `${code} ${message}`;
+
+          if (combined.includes('app-check') || combined.includes('appcheck') || combined.includes('403')) {
+            return 'AI 請求被 App Check 拒絕；請確認網域及 Site key 設定後重新整理';
           }
 
-          this.visionLoading = true;
+          if (combined.includes('429') || combined.includes('quota') || combined.includes('rate')) {
+            return 'AI 使用額度或速率已達上限，請稍後再試';
+          }
 
-          setTimeout(() => {
-            this.visionLoading =
-              false;
+          if (combined.includes('model') && combined.includes('not found')) {
+            return '指定的 Gemini 模型目前不可用';
+          }
 
-            this.formExpense = {
-              id: null,
-              title:
-                "羅森便利商店 (掃描收據)",
-              amount: 1480,
-              currency: "JPY",
-              payer:
-                this.trip.members[0] ||
-                "",
-              category: "餐飲",
-              participants: [
-                ...this.trip.members
-              ],
-              customShares: {}
-            };
+          if (combined.includes('network') || combined.includes('fetch') || !navigator.onLine) {
+            return '目前無法連接 AI 服務，請檢查網絡';
+          }
 
-            this.showExpenseModal =
-              true;
-
-            this.showToast(
-              "AI 圖片辨識完成！"
-            );
-          }, 1200);
+          return 'AI 處理失敗，請稍後再試';
         },
 
-        parseExpenseWithAI() {
-          if (
-            !this.aiPromptText.trim()
-          ) {
-            return this.showToast(
-              "請輸入描述"
+        parseAIJsonResponse(result) {
+          const rawText = result?.response?.text?.();
+
+          if (!rawText) {
+            throw new Error('AI 沒有回傳可用內容');
+          }
+
+          const cleaned = rawText
+            .trim()
+            .replace(/^```json\s*/i, '')
+            .replace(/^```\s*/i, '')
+            .replace(/\s*```$/i, '');
+
+          return JSON.parse(cleaned);
+        },
+
+        createAIExpenseForm(data, source = 'text') {
+          const members = this.trip.members
+            .map(name => String(name).trim())
+            .filter(Boolean);
+
+          if (members.length === 0) {
+            throw new Error('請先在設定中加入旅行成員');
+          }
+
+          const categories = ['餐飲', '住宿', '交通', '購物', '娛樂', '其他'];
+          const amount = Number(data.amount);
+
+          if (!Number.isFinite(amount) || amount <= 0) {
+            throw new Error(
+              source === 'receipt'
+                ? '未能從收據可靠辨識總金額，請手動輸入'
+                : '未能從描述辨識有效金額'
             );
           }
 
-          this.aiLoading = true;
+          const title = String(data.title || '').trim() || '未命名消費';
+          const currency = this.currencies.includes(data.currency)
+            ? data.currency
+            : this.trip.baseCurrency;
+          const category = categories.includes(data.category)
+            ? data.category
+            : '其他';
+          const payer = members.includes(data.payer)
+            ? data.payer
+            : members[0];
 
-          setTimeout(() => {
-            this.aiLoading = false;
+          let participants = Array.isArray(data.participants)
+            ? data.participants.filter(name => members.includes(name))
+            : [];
 
-            this.formExpense = {
-              id: null,
-              title: "拉麵晚餐",
-              amount: 12000,
-              currency: "JPY",
-              payer: "小明",
-              category: "餐飲",
-              participants:
-                this.trip.members.filter(
-                  (member) => {
-                    return (
-                      member !== "阿美"
-                    );
-                  }
-                ),
-              customShares: {}
+          participants = [...new Set(participants)];
+
+          if (participants.length === 0) {
+            participants = [...members];
+          }
+
+          const customShares = {};
+
+          if (Array.isArray(data.shares)) {
+            data.shares.forEach(share => {
+              const member = String(share?.member || '').trim();
+              const shareAmount = Number(share?.amount);
+
+              if (
+                participants.includes(member) &&
+                Number.isFinite(shareAmount) &&
+                shareAmount > 0
+              ) {
+                customShares[member] = shareAmount;
+              }
+            });
+          }
+
+          const customSum = Object.values(customShares)
+            .reduce((sum, value) => sum + Number(value), 0);
+
+          const assignedCount = Object.keys(customShares).length;
+          const allParticipantsAssigned = assignedCount === participants.length;
+          const invalidAssignedTotal =
+            customSum > amount + 0.000001 ||
+            (
+              allParticipantsAssigned &&
+              Math.abs(customSum - amount) > 0.000001
+            );
+
+          if (invalidAssignedTotal) {
+            Object.keys(customShares).forEach(key => delete customShares[key]);
+          }
+
+          this.formExpense = {
+            id: null,
+            title,
+            amount,
+            currency,
+            payer,
+            category,
+            participants,
+            customShares
+          };
+
+          this.showExpenseModal = true;
+
+          const confidence = Number(data.confidence);
+          const warning = String(data.warning || '').trim();
+          const reviewMessages = [];
+
+          if (warning) {
+            reviewMessages.push(warning);
+          }
+
+          if (Number.isFinite(confidence) && confidence < 0.7) {
+            reviewMessages.push('AI 對這次辨識的信心較低。');
+          }
+
+          if (invalidAssignedTotal) {
+            reviewMessages.push('AI 回傳的指定金額合計不正確，已改為由程式自動平分。');
+          }
+
+          this.aiReviewMessage = reviewMessages.join(' ');
+
+          if (this.aiReviewMessage) {
+            this.showToast('AI 已填表，但有不確定內容，請逐項核對');
+          } else {
+            this.showToast('AI 已完成填表，請確認後再儲存');
+          }
+        },
+
+        async analyzeReceiptWithAI() {
+          if (!this.aiReady) {
+            return this.showToast(this.aiInitError || 'AI 尚未準備完成');
+          }
+
+          if (!this.receiptBase64 || !this.receiptMimeType) {
+            return this.showToast('請先拍攝或選擇照片');
+          }
+
+          if (this.visionLoading) return;
+          this.visionLoading = true;
+
+          try {
+            const firebase = window.firebaseBridge;
+            const Schema = firebase.Schema;
+
+            const responseSchema = Schema.object({
+              properties: {
+                isReceipt: Schema.boolean(),
+                title: Schema.string(),
+                amount: Schema.number(),
+                currency: Schema.enumString({ enum: this.currencies }),
+                category: Schema.enumString({
+                  enum: ['餐飲', '住宿', '交通', '購物', '娛樂', '其他']
+                }),
+                confidence: Schema.number(),
+                warning: Schema.string()
+              }
+            });
+
+            const model = firebase.getGenerativeModel(firebase.ai, {
+              model: 'gemini-3.6-flash',
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema,
+                temperature: 0.1,
+                maxOutputTokens: 512
+              }
+            });
+
+            const prompt = `
+你是旅行記帳收據辨識器。分析這張圖片，只回傳符合指定 JSON schema 的資料。
+
+規則：
+1. 判斷圖片是否為付款收據、帳單、信用卡簽帳單或付款畫面。
+2. title 填商戶名稱；商戶不清楚時填「收據消費」。
+3. amount 必須是實際應付或已付的最終總額，不要使用小計、找續、稅額或單一品項金額。
+4. currency 必須從 HKD、TWD、JPY、KRW、USD、EUR、THB 中選擇；按貨幣符號、文字及收據所在地判斷。
+5. category 必須從餐飲、住宿、交通、購物、娛樂、其他中選擇。
+6. confidence 是 0 至 1 的整體辨識信心。
+7. warning 用繁體中文簡述任何不確定之處；沒有則回傳空字串。
+8. 看不清楚總額時 amount 回傳 0，禁止猜測。
+9. 不要從收據猜測付款人或分帳成員。
+            `.trim();
+
+            const imagePart = {
+              inlineData: {
+                data: this.receiptBase64,
+                mimeType: this.receiptMimeType
+              }
             };
 
-            this.showExpenseModal =
-              true;
+            const result = await model.generateContent([prompt, imagePart]);
+            const data = this.parseAIJsonResponse(result);
 
-            this.aiPromptText = "";
+            if (!data.isReceipt) {
+              throw new Error('所選圖片似乎不是可辨識的收據或付款證明');
+            }
 
-            this.showToast(
-              "AI 已自動解析填寫！"
-            );
-          }, 1200);
+            this.createAIExpenseForm({
+              ...data,
+              payer: this.trip.members[0] || '',
+              participants: [...this.trip.members],
+              shares: []
+            }, 'receipt');
+          } catch (error) {
+            console.error('Receipt AI analysis failed', error);
+
+            const directMessage = String(error?.message || '');
+            if (
+              directMessage.includes('不是可辨識') ||
+              directMessage.includes('未能從收據')
+            ) {
+              this.showToast(directMessage);
+            } else {
+              this.showToast(this.getAIErrorMessage(error));
+            }
+          } finally {
+            this.visionLoading = false;
+          }
+        },
+
+        async parseExpenseWithAI() {
+          const description = this.aiPromptText.trim();
+
+          if (!description) {
+            return this.showToast('請輸入描述');
+          }
+
+          if (!this.aiReady) {
+            return this.showToast(this.aiInitError || 'AI 尚未準備完成');
+          }
+
+          const members = this.trip.members
+            .map(name => String(name).trim())
+            .filter(Boolean);
+
+          if (members.length === 0) {
+            return this.showToast('請先在設定中加入旅行成員');
+          }
+
+          if (this.aiLoading) return;
+          this.aiLoading = true;
+
+          try {
+            const firebase = window.firebaseBridge;
+            const Schema = firebase.Schema;
+
+            const responseSchema = Schema.object({
+              properties: {
+                title: Schema.string(),
+                amount: Schema.number(),
+                currency: Schema.enumString({ enum: this.currencies }),
+                payer: Schema.enumString({ enum: members }),
+                category: Schema.enumString({
+                  enum: ['餐飲', '住宿', '交通', '購物', '娛樂', '其他']
+                }),
+                participants: Schema.array({
+                  items: Schema.enumString({ enum: members }),
+                  maxItems: members.length
+                }),
+                shares: Schema.array({
+                  items: Schema.object({
+                    properties: {
+                      member: Schema.enumString({ enum: members }),
+                      amount: Schema.number()
+                    }
+                  }),
+                  maxItems: members.length
+                }),
+                confidence: Schema.number(),
+                warning: Schema.string()
+              }
+            });
+
+            const model = firebase.getGenerativeModel(firebase.ai, {
+              model: 'gemini-3.6-flash',
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema,
+                temperature: 0.1,
+                maxOutputTokens: 768
+              }
+            });
+
+            const prompt = `
+你是旅行記帳拆帳資料解析器。把使用者描述轉成一筆消費資料，只回傳符合指定 JSON schema 的內容。
+
+目前旅行成員：${JSON.stringify(members)}
+可用貨幣：${JSON.stringify(this.currencies)}
+使用者描述：${description}
+
+規則：
+1. payer、participants、shares.member 只能使用目前旅行成員中的完全相同姓名，禁止創造新成員。
+2. 「大家／全部人／我們」代表所有成員；「某人沒吃／沒有參與」要排除該成員。
+3. 沒有明確說明參與者時，participants 使用所有成員。
+4. 沒有明確說明付款人時，payer 使用成員名單第一位，並在 warning 說明。
+5. amount 是整筆消費總額，必須大於 0；禁止自行換算匯率。
+6. currency 按文字判斷，例如港元=HKD、台幣／新台幣=TWD、日圓／円=JPY、韓圜=KRW、美金=USD、歐元=EUR、泰銖=THB。沒有幣別時使用 ${this.trip.baseCurrency}，並在 warning 說明。
+7. title 要簡短清楚，例如「拉麵晚餐」「機場的士」。
+8. category 只能是餐飲、住宿、交通、購物、娛樂、其他。
+9. shares 只在使用者明確說出個別成員應負擔的實際金額時填寫；普通平均分帳時回傳空陣列。
+10. confidence 是 0 至 1 的整體解析信心。
+11. warning 用繁體中文說明任何假設或不確定之處；沒有則回傳空字串。
+            `.trim();
+
+            const result = await model.generateContent(prompt);
+            const data = this.parseAIJsonResponse(result);
+            this.createAIExpenseForm(data, 'text');
+            this.aiPromptText = '';
+          } catch (error) {
+            console.error('Text AI parsing failed', error);
+
+            const directMessage = String(error?.message || '');
+            if (directMessage.includes('未能從描述')) {
+              this.showToast(directMessage);
+            } else {
+              this.showToast(this.getAIErrorMessage(error));
+            }
+          } finally {
+            this.aiLoading = false;
+          }
         },
 
         copySettlementReport() {
-          let text =
-            `✈️ 【${this.trip.name}】拆帳結算報告\n` +
-            `---------------------------\n`;
-
-          text +=
-            `總金額：${this.trip.baseCurrency} ` +
-            `$${this.formatNumber(
-              this.calculateTotalTripBase()
-            )}\n\n` +
-            `轉帳建議方案：\n`;
-
-          if (
-            this.settlementPlan.length ===
-            0
-          ) {
-            text +=
-              "大家都算清囉！無須轉帳。";
+          let text = `✈️ 【${this.trip.name}】拆帳結算報告\n---------------------------\n`;
+          text += `總金額：${this.trip.baseCurrency} $${this.formatNumber(this.calculateTotalTripBase())}\n\n轉帳建議方案：\n`;
+          if (this.settlementPlan.length === 0) {
+            text += `大家都算清囉！無須轉帳。`;
           } else {
-            this.settlementPlan.forEach(
-              (plan) => {
-                text +=
-                  `👉 ${plan.from} 轉給 ` +
-                  `${plan.to}：` +
-                  `${this.trip.baseCurrency} ` +
-                  `$${this.formatNumber(
-                    plan.amount
-                  )}\n`;
-              }
-            );
+            this.settlementPlan.forEach(p => { text += `👉 ${p.from} 轉給 ${p.to}：${this.trip.baseCurrency} $${this.formatNumber(p.amount)}\n`; });
           }
-
-          navigator.clipboard
-            .writeText(text)
-            .then(() => {
-              this.showToast(
-                "已複製結算文字！"
-              );
-            });
+          navigator.clipboard.writeText(text).then(() => this.showToast('已複製結算文字！'));
         },
 
         openTripSettings() {
-          this.tempTrip = {
-            name: this.trip.name,
-            baseCurrency:
-              this.trip.baseCurrency,
-            members: [
-              ...this.trip.members
-            ]
-          };
-
-          this.tempOriginalMembers = [
-            ...this.trip.members
-          ];
-
-          this.newMemberName = "";
+          this.tempTrip = { name: this.trip.name, baseCurrency: this.trip.baseCurrency, members: [...this.trip.members] };
+          this.tempOriginalMembers = [...this.trip.members];
+          this.newMemberName = '';
           this.showTripModal = true;
         },
 
         addMemberToTemp() {
-          const name =
-            this.newMemberName.trim();
-
-          if (
-            name &&
-            !this.tempTrip.members
-              .includes(name)
-          ) {
-            this.tempTrip.members.push(
-              name
-            );
-
-            this.tempOriginalMembers.push(
-              null
-            );
-
-            this.newMemberName = "";
+          const name = this.newMemberName.trim();
+          if (name && !this.tempTrip.members.includes(name)) {
+            this.tempTrip.members.push(name);
+            this.tempOriginalMembers.push(null);
+            this.newMemberName = '';
           }
         },
 
-        removeMemberFromTemp(index) {
-          if (
-            this.tempTrip.members.length <=
-            1
-          ) {
-            return this.showToast(
-              "至少需保留一位成員"
-            );
-          }
+        removeMemberFromTemp(idx) {
+          if (this.tempTrip.members.length <= 1) return this.showToast('至少需保留一位成員');
 
-          const originalName =
-            this.tempOriginalMembers[
-              index
-            ];
-
+          const originalName = this.tempOriginalMembers[idx];
           if (originalName) {
-            const isReferenced =
-              this.trip.expenses.some(
-                (expense) => {
-                  return (
-                    expense.payer ===
-                      originalName ||
-
-                    (
-                      expense.participants ||
-                      []
-                    ).includes(
-                      originalName
-                    ) ||
-
-                    Object.prototype
-                      .hasOwnProperty.call(
-                        expense.customShares ||
-                          {},
-                        originalName
-                      )
-                  );
-                }
-              );
-
-            if (isReferenced) {
-              return this.showToast(
-                `「${originalName}」已有消費紀錄，請保留成員或先處理相關帳目`
-              );
-            }
+            const isReferenced = this.trip.expenses.some(exp =>
+              exp.payer === originalName ||
+              (exp.participants || []).includes(originalName) ||
+              Object.prototype.hasOwnProperty.call(exp.customShares || {}, originalName)
+            );
+            if (isReferenced) return this.showToast(`「${originalName}」已有消費紀錄，請保留成員或先處理相關帳目`);
           }
 
-          this.tempTrip.members.splice(
-            index,
-            1
-          );
-
-          this.tempOriginalMembers.splice(
-            index,
-            1
-          );
+          this.tempTrip.members.splice(idx, 1);
+          this.tempOriginalMembers.splice(idx, 1);
         },
 
         saveTripSettings() {
-          if (
-            !this.tempTrip.name.trim()
-          ) {
-            return this.showToast(
-              "請輸入行程名稱"
-            );
-          }
+          if (!this.tempTrip.name.trim()) return this.showToast('請輸入行程名稱');
 
-          const cleanedMembers =
-            this.tempTrip.members.map(
-              (name) => {
-                return name.trim();
-              }
-            );
-
-          if (
-            cleanedMembers.some(
-              (name) => !name
-            )
-          ) {
-            return this.showToast(
-              "成員姓名不可留空"
-            );
-          }
-
-          if (
-            new Set(
-              cleanedMembers
-            ).size !==
-            cleanedMembers.length
-          ) {
-            return this.showToast(
-              "成員姓名不可重複"
-            );
-          }
+          const cleanedMembers = this.tempTrip.members.map(name => name.trim());
+          if (cleanedMembers.some(name => !name)) return this.showToast('成員姓名不可留空');
+          if (new Set(cleanedMembers).size !== cleanedMembers.length) return this.showToast('成員姓名不可重複');
 
           const renameMap = {};
+          this.tempOriginalMembers.forEach((originalName, idx) => {
+            if (originalName && originalName !== cleanedMembers[idx]) {
+              renameMap[originalName] = cleanedMembers[idx];
+            }
+          });
 
-          this.tempOriginalMembers
-            .forEach(
-              (
-                originalName,
-                index
-              ) => {
-                if (
-                  originalName &&
-                  originalName !==
-                    cleanedMembers[
-                      index
-                    ]
-                ) {
-                  renameMap[
-                    originalName
-                  ] =
-                    cleanedMembers[
-                      index
-                    ];
-                }
-              }
-            );
+          const previousTrip = JSON.parse(JSON.stringify(this.trip));
+          this.trip.expenses = this.trip.expenses.map(exp => {
+            const renamedShares = {};
+            Object.entries(exp.customShares || {}).forEach(([name, value]) => {
+              renamedShares[renameMap[name] || name] = value;
+            });
 
-          const previousTrip =
-            JSON.parse(
-              JSON.stringify(
-                this.trip
-              )
-            );
+            return {
+              ...exp,
+              payer: renameMap[exp.payer] || exp.payer,
+              participants: (exp.participants || []).map(name => renameMap[name] || name),
+              customShares: renamedShares
+            };
+          });
 
-          this.trip.expenses =
-            this.trip.expenses.map(
-              (expense) => {
-                const renamedShares =
-                  {};
+          this.trip.name = this.tempTrip.name.trim();
+          this.trip.baseCurrency = this.tempTrip.baseCurrency;
+          this.trip.members = cleanedMembers;
 
-                Object.entries(
-                  expense.customShares ||
-                    {}
-                ).forEach(
-                  ([name, value]) => {
-                    renamedShares[
-                      renameMap[name] ||
-                      name
-                    ] = value;
-                  }
-                );
-
-                return {
-                  ...expense,
-
-                  payer:
-                    renameMap[
-                      expense.payer
-                    ] ||
-                    expense.payer,
-
-                  participants:
-                    (
-                      expense.participants ||
-                      []
-                    ).map(
-                      (name) => {
-                        return (
-                          renameMap[name] ||
-                          name
-                        );
-                      }
-                    ),
-
-                  customShares:
-                    renamedShares
-                };
-              }
-            );
-
-          this.trip.name =
-            this.tempTrip.name.trim();
-
-          this.trip.baseCurrency =
-            this.tempTrip.baseCurrency;
-
-          this.trip.members =
-            cleanedMembers;
-
-          if (
-            !this.saveData(
-              "修改行程設定"
-            )
-          ) {
-            this.trip =
-              previousTrip;
-
+          if (!this.saveData('修改行程設定')) {
+            this.trip = previousTrip;
             return;
           }
-
-          this.showTripModal =
-            false;
-
-          this.showToast(
-            "行程設定已更新"
-          );
+          this.showTripModal = false;
+          this.showToast('行程設定已更新');
         }
-
       }));
     });
   </script>
-
 </body>
 </html>
