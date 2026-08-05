@@ -8,8 +8,118 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
+  <!-- Firebase 初始化完成通知 -->
+  <script>
+    window.firebaseReadyPromise = new Promise((resolve, reject) => {
+      window.__resolveFirebaseReady = resolve;
+      window.__rejectFirebaseReady = reject;
+    });
+  </script>
+
+  <!-- Firebase JavaScript SDK（瀏覽器模組版） -->
+  <script type="module">
+    import {
+      initializeApp
+    } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
+
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged,
+      browserLocalPersistence,
+      setPersistence
+    } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
+
+    import {
+      initializeFirestore,
+      getFirestore,
+      persistentLocalCache,
+      persistentMultipleTabManager,
+      doc,
+      getDoc,
+      collection,
+      writeBatch,
+      onSnapshot,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD5pVMm7T4NNEhAVWexLzt-Tsy6ltsu4oU",
+      authDomain: "travel-expense-splitter-6aca5.firebaseapp.com",
+      projectId: "travel-expense-splitter-6aca5",
+      storageBucket: "travel-expense-splitter-6aca5.firebasestorage.app",
+      messagingSenderId: "79057217699",
+      appId: "1:79057217699:web:98c23487206adfcd43b716"
+    };
+
+    try {
+      const firebaseApp = initializeApp(firebaseConfig);
+      const auth = getAuth(firebaseApp);
+
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+      } catch (authPersistenceError) {
+        console.warn(
+          "登入狀態無法持久保存，仍會繼續啟用 Firebase。",
+          authPersistenceError
+        );
+      }
+
+      let db;
+      let persistentCacheEnabled = true;
+
+      try {
+        db = initializeFirestore(firebaseApp, {
+          localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager()
+          })
+        });
+      } catch (cacheError) {
+        console.warn(
+          "Firestore 持久離線快取無法啟用，改用記憶體快取。",
+          cacheError
+        );
+
+        persistentCacheEnabled = false;
+        db = getFirestore(firebaseApp);
+      }
+
+      window.firebaseBridge = {
+        auth,
+        db,
+        persistentCacheEnabled,
+        GoogleAuthProvider,
+        signInWithPopup,
+        signOut,
+        onAuthStateChanged,
+        doc,
+        getDoc,
+        collection,
+        writeBatch,
+        onSnapshot,
+        serverTimestamp
+      };
+
+      window.__resolveFirebaseReady(
+        window.firebaseBridge
+      );
+    } catch (error) {
+      console.error(
+        "Firebase 初始化失敗",
+        error
+      );
+
+      window.__rejectFirebaseReady(error);
+    }
+  </script>
+
   <!-- Alpine.js -->
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script
+    defer
+    src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"
+  ></script>
 
   <style>
     [x-cloak] {
@@ -37,9 +147,11 @@
 
   <!-- 頂部導航列 -->
   <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-30">
+
     <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
 
       <div class="flex items-center space-x-2">
+
         <svg
           class="w-6 h-6"
           fill="none"
@@ -65,9 +177,11 @@
             x-text="'本位幣：' + trip.baseCurrency + ' | 成員 ' + trip.members.length + ' 人'"
           ></p>
         </div>
+
       </div>
 
       <div class="flex items-center gap-1.5">
+
         <button
           @click="openSyncModal()"
           class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1"
@@ -81,10 +195,151 @@
         >
           ⚙️ 設定
         </button>
+
       </div>
 
     </div>
   </header>
+
+  <!-- 雲端備份狀態 -->
+  <section class="max-w-md mx-auto px-4 mt-3">
+
+    <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+
+      <template x-if="!firebaseReady && !firebaseLoadFailed">
+
+        <div class="flex items-center justify-between gap-3">
+
+          <div>
+            <div class="text-sm font-semibold text-slate-700">
+              ☁️ 雲端備份
+            </div>
+
+            <div class="text-xs text-slate-500 mt-0.5">
+              正在載入 Firebase；本機記帳仍可正常使用。
+            </div>
+          </div>
+
+          <div class="text-xs text-slate-400">
+            初始化中
+          </div>
+
+        </div>
+
+      </template>
+
+      <template x-if="firebaseLoadFailed">
+
+        <div>
+          <div class="text-sm font-semibold text-rose-700">
+            ☁️ 雲端功能載入失敗
+          </div>
+
+          <div class="text-xs text-slate-500 mt-0.5">
+            本機記帳仍可使用；請檢查網絡後重新整理頁面。
+          </div>
+        </div>
+
+      </template>
+
+      <template x-if="firebaseReady && !firebaseUser">
+
+        <div class="flex items-center justify-between gap-3">
+
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-slate-700">
+              ☁️ 尚未啟用雲端備份
+            </div>
+
+            <div class="text-xs text-amber-600 mt-0.5">
+              目前資料只保存在這部裝置的瀏覽器。
+            </div>
+          </div>
+
+          <button
+            @click="signInWithGoogle()"
+            :disabled="authLoading"
+            class="shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-2 rounded-lg"
+            x-text="authLoading ? '登入中…' : 'Google 登入'"
+          ></button>
+
+        </div>
+
+      </template>
+
+      <template x-if="firebaseReady && firebaseUser">
+
+        <div class="space-y-2">
+
+          <div class="flex items-start justify-between gap-3">
+
+            <div class="min-w-0">
+
+              <div
+                class="text-sm font-semibold text-slate-700 truncate"
+                x-text="firebaseUser.email || firebaseUser.displayName || 'Google 使用者'"
+              ></div>
+
+              <div
+                class="text-xs mt-0.5"
+                :class="{
+                  'text-emerald-600': syncStatus === '已同步',
+                  'text-amber-600':
+                    syncStatus.includes('等待') ||
+                    syncStatus.includes('離線') ||
+                    syncStatus.includes('暫停') ||
+                    syncStatus.includes('較新'),
+                  'text-rose-600': syncStatus.includes('失敗'),
+                  'text-slate-500': !syncStatus
+                }"
+                x-text="syncStatus"
+              ></div>
+
+            </div>
+
+            <button
+              @click="signOutFirebase()"
+              class="shrink-0 text-xs text-slate-500 hover:underline"
+            >
+              登出
+            </button>
+
+          </div>
+
+          <div class="flex gap-2">
+
+            <button
+              x-show="syncStatus === '雲端有較新資料'"
+              @click="reviewLatestCloudData()"
+              class="flex-1 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-medium py-1.5 rounded-lg"
+            >
+              查看雲端版本
+            </button>
+
+            <button
+              x-show="syncStatus !== '雲端有較新資料'"
+              @click="manualCloudSync()"
+              :disabled="cloudBusy || showCloudConflictModal"
+              class="flex-1 bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-medium py-1.5 rounded-lg disabled:opacity-50"
+              x-text="
+                cloudBusy
+                  ? '處理中…'
+                  : (
+                      cloudSyncEnabled
+                        ? '立即備份'
+                        : '重新檢查'
+                    )
+              "
+            ></button>
+
+          </div>
+
+        </div>
+
+      </template>
+
+    </div>
+  </section>
 
   <!-- 主內容區塊 -->
   <main class="max-w-md mx-auto px-4 mt-4 space-y-4">
@@ -94,9 +349,11 @@
 
       <button
         @click="activeTab = 'expenses'"
-        :class="activeTab === 'expenses'
-          ? 'bg-white text-indigo-600 shadow'
-          : 'text-slate-600'"
+        :class="
+          activeTab === 'expenses'
+            ? 'bg-white text-indigo-600 shadow'
+            : 'text-slate-600'
+        "
         class="flex-1 py-2 text-center rounded-lg transition"
       >
         消費明細
@@ -104,9 +361,11 @@
 
       <button
         @click="activeTab = 'settlement'"
-        :class="activeTab === 'settlement'
-          ? 'bg-white text-indigo-600 shadow'
-          : 'text-slate-600'"
+        :class="
+          activeTab === 'settlement'
+            ? 'bg-white text-indigo-600 shadow'
+            : 'text-slate-600'
+        "
         class="flex-1 py-2 text-center rounded-lg transition"
       >
         結算方案
@@ -114,9 +373,11 @@
 
       <button
         @click="activeTab = 'ai'"
-        :class="activeTab === 'ai'
-          ? 'bg-white text-indigo-600 shadow'
-          : 'text-slate-600'"
+        :class="
+          activeTab === 'ai'
+            ? 'bg-white text-indigo-600 shadow'
+            : 'text-slate-600'
+        "
         class="flex-1 py-2 text-center rounded-lg transition"
       >
         🤖 AI 助手
@@ -138,7 +399,13 @@
 
         <div
           class="text-3xl font-extrabold mt-1"
-          x-text="trip.baseCurrency + ' $' + formatNumber(calculateTotalTripBase())"
+          x-text="
+            trip.baseCurrency +
+            ' $' +
+            formatNumber(
+              calculateTotalTripBase()
+            )
+          "
         ></div>
 
         <div class="text-xs text-indigo-100 mt-2 flex justify-between">
@@ -152,15 +419,19 @@
           <span>
             人均：
             <strong
-              x-text="trip.baseCurrency + ' $' +
+              x-text="
+                trip.baseCurrency +
+                ' $' +
                 formatNumber(
                   calculateTotalTripBase() /
                   (trip.members.length || 1)
-                )"
+                )
+              "
             ></strong>
           </span>
 
         </div>
+
       </div>
 
       <div class="flex gap-2">
@@ -169,6 +440,7 @@
           @click="openExpenseModal()"
           class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-xl shadow flex items-center justify-center gap-1.5 transition"
         >
+
           <svg
             class="w-5 h-5"
             fill="none"
@@ -184,6 +456,7 @@
           </svg>
 
           新增消費紀錄
+
         </button>
 
         <button
@@ -198,15 +471,18 @@
       <div class="space-y-2">
 
         <template x-if="trip.expenses.length === 0">
+
           <div class="bg-white rounded-xl p-8 text-center text-slate-400 border border-slate-200">
             尚無消費紀錄，點擊上方按鈕新增！
           </div>
+
         </template>
 
         <template
           x-for="(exp, index) in trip.expenses"
           :key="exp.id || index"
         >
+
           <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
 
             <div class="flex items-center space-x-3">
@@ -232,7 +508,9 @@
 
                   付款
 
-                  <span class="text-slate-300">|</span>
+                  <span class="text-slate-300">
+                    |
+                  </span>
 
                   <span
                     x-text="
@@ -247,7 +525,9 @@
                   ></span>
 
                 </div>
+
               </div>
+
             </div>
 
             <div class="text-right">
@@ -294,12 +574,15 @@
                 </button>
 
               </div>
+
             </div>
 
           </div>
+
         </template>
 
       </div>
+
     </div>
 
     <!-- 結算方案 -->
@@ -324,6 +607,7 @@
             x-for="m in memberBalances"
             :key="m.name"
           >
+
             <div class="flex justify-between items-center py-2 border-b border-slate-100 last:border-0 text-sm">
 
               <span
@@ -332,6 +616,7 @@
               ></span>
 
               <div class="text-right">
+
                 <span
                   :class="
                     m.net >= 0
@@ -345,12 +630,15 @@
                     formatNumber(m.net)
                   "
                 ></span>
+
               </div>
 
             </div>
+
           </template>
 
         </div>
+
       </div>
 
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
@@ -371,9 +659,11 @@
         </div>
 
         <template x-if="settlementPlan.length === 0">
+
           <p class="text-slate-400 text-sm text-center py-4">
             帳目已完全平算，無需再轉帳！🎉
           </p>
+
         </template>
 
         <div class="space-y-2">
@@ -382,6 +672,7 @@
             x-for="(plan, idx) in settlementPlan"
             :key="idx"
           >
+
             <div class="bg-indigo-50/60 p-3 rounded-lg border border-indigo-100 flex items-center justify-between text-sm">
 
               <div class="flex items-center space-x-2">
@@ -391,7 +682,9 @@
                   x-text="plan.from"
                 ></span>
 
-                <span class="text-slate-400">➔</span>
+                <span class="text-slate-400">
+                  ➔
+                </span>
 
                 <span
                   class="font-bold text-slate-800"
@@ -410,9 +703,11 @@
               ></div>
 
             </div>
+
           </template>
 
         </div>
+
       </div>
 
     </div>
@@ -447,6 +742,7 @@
         >
 
           <template x-if="!receiptImage">
+
             <div>
               <div class="text-3xl mb-1">
                 🖼️ / 📷
@@ -456,9 +752,11 @@
                 點擊選擇相簿照片或拍照
               </div>
             </div>
+
           </template>
 
           <template x-if="receiptImage">
+
             <div class="space-y-2">
 
               <img
@@ -471,6 +769,7 @@
               </div>
 
             </div>
+
           </template>
 
         </div>
@@ -528,7 +827,7 @@
 
   </main>
 
-  <!-- 跨裝置同步與備份彈窗 -->
+  <!-- 同步與備份彈窗 -->
   <div
     x-show="showSyncModal"
     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -611,6 +910,7 @@
       </div>
 
     </div>
+
   </div>
 
   <!-- 行程設定彈窗 -->
@@ -689,6 +989,7 @@
               x-for="(m, idx) in tempTrip.members"
               :key="idx"
             >
+
               <div class="flex items-center space-x-2">
 
                 <input
@@ -705,6 +1006,7 @@
                 </button>
 
               </div>
+
             </template>
 
           </div>
@@ -750,6 +1052,7 @@
       </div>
 
     </div>
+
   </div>
 
   <!-- 新增／編輯消費彈窗 -->
@@ -891,7 +1194,6 @@
 
         </div>
 
-        <!-- 拆帳分配區 -->
         <div>
 
           <div class="flex justify-between items-center mb-1">
@@ -912,6 +1214,7 @@
               x-for="m in trip.members"
               :key="m"
             >
+
               <div class="flex items-center justify-between gap-2 text-xs bg-white p-1.5 rounded border border-slate-100">
 
                 <label class="flex items-center space-x-2 cursor-pointer flex-1">
@@ -951,6 +1254,7 @@
                 </div>
 
               </div>
+
             </template>
 
           </div>
@@ -978,6 +1282,117 @@
       </div>
 
     </div>
+
+  </div>
+
+  <!-- 本機與雲端版本衝突 -->
+  <div
+    x-show="showCloudConflictModal"
+    class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+  >
+
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
+
+      <div>
+
+        <h3 class="font-bold text-slate-800 text-lg">
+          偵測到兩個不同版本
+        </h3>
+
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+          為免自動覆蓋資料，請選擇要保留哪一份。選擇前不會上傳或覆蓋任何一方。
+        </p>
+
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-xs">
+
+        <div class="border border-indigo-200 bg-indigo-50/50 rounded-xl p-3">
+
+          <div class="font-bold text-indigo-700">
+            本機版本
+          </div>
+
+          <div
+            class="mt-2 text-slate-700 break-words"
+            x-text="trip.name"
+          ></div>
+
+          <div
+            class="text-slate-500 mt-1"
+            x-text="trip.expenses.length + ' 筆消費'"
+          ></div>
+
+          <div
+            class="text-slate-400 mt-1"
+            x-text="formatDateTime(lastLocalUpdatedAt)"
+          ></div>
+
+        </div>
+
+        <div class="border border-emerald-200 bg-emerald-50/50 rounded-xl p-3">
+
+          <div class="font-bold text-emerald-700">
+            雲端版本
+          </div>
+
+          <div
+            class="mt-2 text-slate-700 break-words"
+            x-text="
+              cloudConflictTrip
+                ? cloudConflictTrip.name
+                : '—'
+            "
+          ></div>
+
+          <div
+            class="text-slate-500 mt-1"
+            x-text="
+              cloudConflictTrip
+                ? cloudConflictTrip.expenses.length + ' 筆消費'
+                : '—'
+            "
+          ></div>
+
+          <div
+            class="text-slate-400 mt-1"
+            x-text="formatDateTime(cloudConflictUpdatedAt)"
+          ></div>
+
+        </div>
+
+      </div>
+
+      <div class="space-y-2">
+
+        <button
+          @click="useCloudVersion()"
+          :disabled="cloudBusy"
+          class="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium"
+        >
+          使用雲端版本，覆蓋本機
+        </button>
+
+        <button
+          @click="useLocalVersion()"
+          :disabled="cloudBusy"
+          class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium"
+        >
+          使用本機版本，覆蓋雲端
+        </button>
+
+        <button
+          @click="pauseCloudSync()"
+          :disabled="cloudBusy"
+          class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-xs font-medium"
+        >
+          暫不同步，兩邊都保留
+        </button>
+
+      </div>
+
+    </div>
+
   </div>
 
   <!-- 一般提示 -->
@@ -989,14 +1404,16 @@
     <span x-text="toast.message"></span>
   </div>
 
-  <!-- 刪除後復原提示 -->
+  <!-- 復原刪除 -->
   <div
     x-show="undoDelete.show"
     x-transition
     class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-4 py-2.5 rounded-full shadow-lg z-50 flex items-center gap-3"
   >
 
-    <span>已刪除消費紀錄</span>
+    <span>
+      已刪除消費紀錄
+    </span>
 
     <button
       @click="undoDeleteExpense()"
@@ -1091,12 +1508,63 @@
           timer: null
         },
 
-        init() {
-          const urlParams = new URLSearchParams(
-            window.location.search
-          );
+        firebaseReady: false,
+        firebaseLoadFailed: false,
+        firebaseUser: null,
+        authLoading: false,
+        cloudBusy: false,
+        cloudSyncEnabled: false,
+        cloudUnsubscribe: null,
+        syncStatus: "正在初始化雲端功能",
+        hasStoredLocalData: false,
+        lastLocalUpdatedAt: 0,
+        showCloudConflictModal: false,
+        cloudConflictTrip: null,
+        cloudConflictUpdatedAt: 0,
+        pendingCloudTrip: null,
+        pendingCloudUpdatedAt: 0,
 
-          const sharedData = urlParams.get("data");
+        async init() {
+          const dataKey =
+            "travel_expense_data";
+
+          const metaKey =
+            "travel_expense_meta";
+
+          let storedRaw = null;
+
+          try {
+            storedRaw =
+              localStorage.getItem(dataKey);
+
+            this.hasStoredLocalData =
+              Boolean(storedRaw);
+
+            const storedMeta = JSON.parse(
+              localStorage.getItem(metaKey) ||
+              "{}"
+            );
+
+            this.lastLocalUpdatedAt =
+              Number(storedMeta.updatedAtMs) ||
+              0;
+          } catch (error) {
+            console.warn(
+              "Local storage unavailable",
+              error
+            );
+
+            this.hasStoredLocalData = false;
+            this.lastLocalUpdatedAt = 0;
+          }
+
+          const urlParams =
+            new URLSearchParams(
+              window.location.search
+            );
+
+          const sharedData =
+            urlParams.get("data");
 
           if (sharedData) {
             try {
@@ -1107,20 +1575,13 @@
               );
 
               if (decoded && decoded.name) {
-                const previousTrip = JSON.parse(
-                  JSON.stringify(this.trip)
-                );
-
                 this.trip = decoded;
 
-                if (this.saveData()) {
-                  /*
-                   * 成功從分享網址匯入後，
-                   * 立即移除網址中的 data 參數。
-                   *
-                   * 這樣重新整理時便會讀取 localStorage
-                   * 內的最新帳目，而不會再次載入舊分享快照。
-                   */
+                if (
+                  this.saveData(
+                    "從分享連結匯入"
+                  )
+                ) {
                   window.history.replaceState(
                     {},
                     document.title,
@@ -1130,8 +1591,6 @@
                   this.showToast(
                     "已成功從分享連結載入最新行程資料！"
                   );
-                } else {
-                  this.trip = previousTrip;
                 }
               }
             } catch (error) {
@@ -1144,18 +1603,13 @@
                 "分享網址資料無法讀取"
               );
             }
-          } else {
+          } else if (storedRaw) {
             try {
-              const saved = localStorage.getItem(
-                "travel_expense_data"
-              );
+              const parsed =
+                JSON.parse(storedRaw);
 
-              if (saved) {
-                const parsed = JSON.parse(saved);
-
-                if (parsed && parsed.name) {
-                  this.trip = parsed;
-                }
+              if (parsed && parsed.name) {
+                this.trip = parsed;
               }
             } catch (error) {
               console.warn(
@@ -1169,38 +1623,971 @@
             }
           }
 
-          /*
-           * 不再於消費紀錄為空時加入示範帳目。
-           * 即使使用者刪除全部消費，重新整理後仍維持空白。
-           */
-          if (!Array.isArray(this.trip.expenses)) {
+          if (
+            !Array.isArray(
+              this.trip.expenses
+            )
+          ) {
             this.trip.expenses = [];
           }
 
-          if (!Array.isArray(this.trip.members)) {
+          if (
+            !Array.isArray(
+              this.trip.members
+            )
+          ) {
             this.trip.members = [];
+          }
+
+          window.addEventListener(
+            "online",
+            () => {
+              if (
+                this.firebaseUser &&
+                !this.cloudSyncEnabled &&
+                !this.showCloudConflictModal
+              ) {
+                this.reconcileCloudAndLocal();
+              } else if (
+                this.firebaseUser &&
+                this.syncStatus.includes(
+                  "離線"
+                )
+              ) {
+                this.syncStatus =
+                  "等待同步";
+              }
+            }
+          );
+
+          window.addEventListener(
+            "offline",
+            () => {
+              if (this.firebaseUser) {
+                this.syncStatus =
+                  "離線：資料已保存在本機";
+              }
+            }
+          );
+
+          this.initializeFirebaseConnection();
+        },
+
+        async initializeFirebaseConnection() {
+          try {
+            await window.firebaseReadyPromise;
+
+            this.firebaseReady = true;
+            this.syncStatus =
+              "只儲存在此裝置";
+
+            const firebase =
+              window.firebaseBridge;
+
+            firebase.onAuthStateChanged(
+              firebase.auth,
+
+              async (user) => {
+                if (user) {
+                  this.firebaseUser = {
+                    uid: user.uid,
+                    email: user.email || "",
+                    displayName:
+                      user.displayName || "",
+                    photoURL:
+                      user.photoURL || ""
+                  };
+
+                  await this.reconcileCloudAndLocal();
+                } else {
+                  if (this.cloudUnsubscribe) {
+                    this.cloudUnsubscribe();
+                    this.cloudUnsubscribe = null;
+                  }
+
+                  this.firebaseUser = null;
+                  this.cloudSyncEnabled = false;
+                  this.syncStatus =
+                    "只儲存在此裝置";
+                }
+              },
+
+              (error) => {
+                console.error(
+                  "Authentication state error",
+                  error
+                );
+
+                this.syncStatus =
+                  "登入狀態讀取失敗";
+              }
+            );
+          } catch (error) {
+            console.error(
+              "Firebase unavailable",
+              error
+            );
+
+            this.firebaseReady = false;
+            this.firebaseLoadFailed = true;
+
+            this.syncStatus =
+              "雲端功能載入失敗；本機資料不受影響";
           }
         },
 
-        saveData() {
+        async signInWithGoogle() {
+          if (
+            !window.firebaseBridge ||
+            this.authLoading
+          ) {
+            return;
+          }
+
+          this.authLoading = true;
+
+          try {
+            const firebase =
+              window.firebaseBridge;
+
+            const provider =
+              new firebase.GoogleAuthProvider();
+
+            await firebase.signInWithPopup(
+              firebase.auth,
+              provider
+            );
+          } catch (error) {
+            console.error(
+              "Google sign-in failed",
+              error
+            );
+
+            const messages = {
+              "auth/popup-closed-by-user":
+                "登入視窗已關閉，未完成登入",
+
+              "auth/cancelled-popup-request":
+                "登入程序已取消",
+
+              "auth/popup-blocked":
+                "瀏覽器阻擋了登入視窗，請允許彈出視窗後重試",
+
+              "auth/unauthorized-domain":
+                "此 GitHub Pages 網域尚未加入 Firebase 已授權網域"
+            };
+
+            this.showToast(
+              messages[error.code] ||
+              "Google 登入失敗，請稍後再試"
+            );
+          } finally {
+            this.authLoading = false;
+          }
+        },
+
+        async signOutFirebase() {
+          if (!window.firebaseBridge) {
+            return;
+          }
+
+          try {
+            if (this.cloudUnsubscribe) {
+              this.cloudUnsubscribe();
+              this.cloudUnsubscribe = null;
+            }
+
+            await window.firebaseBridge.signOut(
+              window.firebaseBridge.auth
+            );
+
+            this.showToast(
+              "已登出；資料仍保留在本機"
+            );
+          } catch (error) {
+            console.error(
+              "Sign out failed",
+              error
+            );
+
+            this.showToast(
+              "登出失敗"
+            );
+          }
+        },
+
+        getCloudTripReference() {
+          const firebase =
+            window.firebaseBridge;
+
+          const user =
+            firebase?.auth?.currentUser;
+
+          if (!firebase || !user) {
+            return null;
+          }
+
+          return firebase.doc(
+            firebase.db,
+            "users",
+            user.uid,
+            "trips",
+            "main"
+          );
+        },
+
+        normaliseTripData(data) {
+          const cloned = JSON.parse(
+            JSON.stringify(data || {})
+          );
+
+          if (
+            !Array.isArray(
+              cloned.expenses
+            )
+          ) {
+            cloned.expenses = [];
+          }
+
+          if (
+            !Array.isArray(
+              cloned.members
+            )
+          ) {
+            cloned.members = [];
+          }
+
+          if (!cloned.name) {
+            cloned.name =
+              "未命名行程";
+          }
+
+          if (!cloned.baseCurrency) {
+            cloned.baseCurrency =
+              "HKD";
+          }
+
+          return cloned;
+        },
+
+        tripsAreEqual(first, second) {
+          try {
+            return (
+              JSON.stringify(
+                this.normaliseTripData(first)
+              ) ===
+              JSON.stringify(
+                this.normaliseTripData(second)
+              )
+            );
+          } catch (error) {
+            return false;
+          }
+        },
+
+        getCloudUpdatedAt(data) {
+          if (
+            data?.updatedAt &&
+            typeof data.updatedAt.toMillis ===
+              "function"
+          ) {
+            return data.updatedAt.toMillis();
+          }
+
+          return (
+            Number(
+              data?.clientUpdatedAtMs
+            ) || 0
+          );
+        },
+
+        formatDateTime(timestamp) {
+          const value =
+            Number(timestamp) || 0;
+
+          if (!value) {
+            return "時間不詳";
+          }
+
+          return new Date(
+            value
+          ).toLocaleString(
+            "zh-HK",
+            {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit"
+            }
+          );
+        },
+
+        saveLocalDataOnly(
+          updatedAtMs = Date.now()
+        ) {
           try {
             localStorage.setItem(
               "travel_expense_data",
               JSON.stringify(this.trip)
             );
 
+            localStorage.setItem(
+              "travel_expense_meta",
+              JSON.stringify({
+                updatedAtMs,
+                schemaVersion: 1
+              })
+            );
+
+            this.lastLocalUpdatedAt =
+              updatedAtMs;
+
+            this.hasStoredLocalData =
+              true;
+
             return true;
           } catch (error) {
             console.error(
-              "Save failed",
+              "Local save failed",
               error
             );
 
             this.showToast(
-              "儲存失敗，請立即匯出備份並檢查瀏覽器儲存空間"
+              "本機儲存失敗，請立即複製資料備份"
             );
 
             return false;
+          }
+        },
+
+        saveData(
+          action = "更新行程"
+        ) {
+          const updatedAtMs =
+            Date.now();
+
+          if (
+            !this.saveLocalDataOnly(
+              updatedAtMs
+            )
+          ) {
+            return false;
+          }
+
+          if (
+            this.firebaseUser &&
+            this.cloudSyncEnabled &&
+            !this.showCloudConflictModal
+          ) {
+            this.saveTripToCloud(action);
+          } else if (
+            !this.firebaseUser
+          ) {
+            this.syncStatus =
+              "只儲存在此裝置";
+          }
+
+          return true;
+        },
+
+        async reconcileCloudAndLocal() {
+          if (
+            !window.firebaseBridge ||
+            !this.firebaseUser ||
+            this.cloudBusy
+          ) {
+            return;
+          }
+
+          const tripReference =
+            this.getCloudTripReference();
+
+          if (!tripReference) {
+            return;
+          }
+
+          this.cloudBusy = true;
+          this.cloudSyncEnabled = false;
+
+          this.syncStatus =
+            navigator.onLine
+              ? "正在檢查雲端資料"
+              : "離線：等待檢查雲端資料";
+
+          try {
+            const snapshot =
+              await window.firebaseBridge.getDoc(
+                tripReference
+              );
+
+            if (!snapshot.exists()) {
+              this.cloudSyncEnabled = true;
+
+              this.startCloudListener();
+
+              this.saveTripToCloud(
+                "首次雲端備份"
+              );
+
+              return;
+            }
+
+            const cloudDocument =
+              snapshot.data();
+
+            const cloudTrip =
+              this.normaliseTripData(
+                cloudDocument.tripData
+              );
+
+            const cloudUpdatedAt =
+              this.getCloudUpdatedAt(
+                cloudDocument
+              );
+
+            if (!this.hasStoredLocalData) {
+              this.applyCloudTrip(
+                cloudTrip,
+                cloudUpdatedAt
+              );
+
+              this.cloudSyncEnabled = true;
+
+              this.startCloudListener();
+
+              this.syncStatus =
+                snapshot.metadata.fromCache
+                  ? "已載入離線雲端快取"
+                  : "已同步";
+
+              this.showToast(
+                "已從雲端載入行程資料"
+              );
+
+              return;
+            }
+
+            if (
+              this.tripsAreEqual(
+                this.trip,
+                cloudTrip
+              )
+            ) {
+              if (
+                cloudUpdatedAt >
+                this.lastLocalUpdatedAt
+              ) {
+                this.saveLocalDataOnly(
+                  cloudUpdatedAt
+                );
+              }
+
+              this.cloudSyncEnabled = true;
+
+              this.startCloudListener();
+
+              this.syncStatus =
+                snapshot.metadata.fromCache
+                  ? "已載入離線雲端快取"
+                  : "已同步";
+
+              return;
+            }
+
+            this.cloudConflictTrip =
+              cloudTrip;
+
+            this.cloudConflictUpdatedAt =
+              cloudUpdatedAt;
+
+            this.showCloudConflictModal =
+              true;
+
+            this.syncStatus =
+              "等待選擇版本";
+          } catch (error) {
+            console.error(
+              "Cloud reconciliation failed",
+              error
+            );
+
+            this.syncStatus =
+              navigator.onLine
+                ? "同步失敗；本機資料仍安全保存"
+                : "離線：資料已保存在本機";
+          } finally {
+            this.cloudBusy = false;
+          }
+        },
+
+        applyCloudTrip(
+          cloudTrip,
+          cloudUpdatedAt = Date.now()
+        ) {
+          const previousTrip =
+            this.trip;
+
+          this.trip =
+            this.normaliseTripData(
+              cloudTrip
+            );
+
+          if (
+            !this.saveLocalDataOnly(
+              cloudUpdatedAt ||
+              Date.now()
+            )
+          ) {
+            this.trip =
+              previousTrip;
+
+            return false;
+          }
+
+          return true;
+        },
+
+        async useCloudVersion() {
+          if (
+            !this.cloudConflictTrip ||
+            this.cloudBusy
+          ) {
+            return;
+          }
+
+          this.cloudBusy = true;
+
+          try {
+            if (
+              !this.applyCloudTrip(
+                this.cloudConflictTrip,
+                this.cloudConflictUpdatedAt
+              )
+            ) {
+              return;
+            }
+
+            this.showCloudConflictModal =
+              false;
+
+            this.cloudConflictTrip = null;
+            this.cloudConflictUpdatedAt = 0;
+            this.pendingCloudTrip = null;
+            this.pendingCloudUpdatedAt = 0;
+            this.cloudSyncEnabled = true;
+
+            this.startCloudListener();
+
+            this.syncStatus = "已同步";
+
+            this.showToast(
+              "已使用雲端版本"
+            );
+          } finally {
+            this.cloudBusy = false;
+          }
+        },
+
+        async useLocalVersion() {
+          if (this.cloudBusy) {
+            return;
+          }
+
+          this.cloudBusy = true;
+
+          try {
+            this.showCloudConflictModal =
+              false;
+
+            this.cloudSyncEnabled = true;
+
+            this.startCloudListener();
+
+            this.syncStatus =
+              navigator.onLine
+                ? "等待同步"
+                : "離線：等待同步";
+
+            this.saveTripToCloud(
+              "以本機版本覆蓋雲端"
+            );
+
+            this.cloudConflictTrip = null;
+            this.cloudConflictUpdatedAt = 0;
+            this.pendingCloudTrip = null;
+            this.pendingCloudUpdatedAt = 0;
+          } finally {
+            this.cloudBusy = false;
+          }
+        },
+
+        pauseCloudSync() {
+          this.showCloudConflictModal =
+            false;
+
+          this.cloudSyncEnabled =
+            false;
+
+          this.cloudConflictTrip =
+            null;
+
+          this.cloudConflictUpdatedAt =
+            0;
+
+          this.pendingCloudTrip =
+            null;
+
+          this.pendingCloudUpdatedAt =
+            0;
+
+          this.syncStatus =
+            "同步已暫停；兩邊資料均未覆蓋";
+        },
+
+        async manualCloudSync() {
+          if (
+            !this.firebaseUser ||
+            this.cloudBusy
+          ) {
+            return;
+          }
+
+          if (!this.cloudSyncEnabled) {
+            await this.reconcileCloudAndLocal();
+            return;
+          }
+
+          this.saveTripToCloud(
+            "手動雲端備份"
+          );
+        },
+
+        async reviewLatestCloudData() {
+          if (
+            this.pendingCloudTrip &&
+            !this.cloudBusy
+          ) {
+            this.cloudConflictTrip =
+              this.pendingCloudTrip;
+
+            this.cloudConflictUpdatedAt =
+              this.pendingCloudUpdatedAt;
+
+            this.pendingCloudTrip = null;
+            this.pendingCloudUpdatedAt = 0;
+
+            this.showCloudConflictModal =
+              true;
+
+            this.syncStatus =
+              "等待選擇版本";
+
+            return;
+          }
+
+          if (
+            !window.firebaseBridge ||
+            !this.firebaseUser ||
+            this.cloudBusy
+          ) {
+            return;
+          }
+
+          const tripReference =
+            this.getCloudTripReference();
+
+          if (!tripReference) {
+            return;
+          }
+
+          this.cloudBusy = true;
+
+          try {
+            const snapshot =
+              await window.firebaseBridge.getDoc(
+                tripReference
+              );
+
+            if (!snapshot.exists()) {
+              this.showToast(
+                "雲端尚未有資料"
+              );
+
+              return;
+            }
+
+            const cloudDocument =
+              snapshot.data();
+
+            const cloudTrip =
+              this.normaliseTripData(
+                cloudDocument.tripData
+              );
+
+            if (
+              this.tripsAreEqual(
+                this.trip,
+                cloudTrip
+              )
+            ) {
+              this.syncStatus =
+                "已同步";
+
+              this.showToast(
+                "本機與雲端資料一致"
+              );
+
+              return;
+            }
+
+            this.cloudConflictTrip =
+              cloudTrip;
+
+            this.cloudConflictUpdatedAt =
+              this.getCloudUpdatedAt(
+                cloudDocument
+              );
+
+            this.showCloudConflictModal =
+              true;
+
+            this.syncStatus =
+              "等待選擇版本";
+          } catch (error) {
+            console.error(
+              "Cloud refresh failed",
+              error
+            );
+
+            this.showToast(
+              "無法讀取最新雲端資料"
+            );
+          } finally {
+            this.cloudBusy = false;
+          }
+        },
+
+        startCloudListener() {
+          if (
+            !window.firebaseBridge ||
+            !this.firebaseUser
+          ) {
+            return;
+          }
+
+          const tripReference =
+            this.getCloudTripReference();
+
+          if (!tripReference) {
+            return;
+          }
+
+          if (this.cloudUnsubscribe) {
+            this.cloudUnsubscribe();
+          }
+
+          this.cloudUnsubscribe =
+            window.firebaseBridge.onSnapshot(
+              tripReference,
+
+              {
+                includeMetadataChanges: true
+              },
+
+              (snapshot) => {
+                if (!snapshot.exists()) {
+                  return;
+                }
+
+                if (
+                  snapshot.metadata
+                    .hasPendingWrites
+                ) {
+                  this.syncStatus =
+                    navigator.onLine
+                      ? "等待同步"
+                      : "離線：等待同步";
+
+                  return;
+                }
+
+                const cloudDocument =
+                  snapshot.data();
+
+                const cloudTrip =
+                  this.normaliseTripData(
+                    cloudDocument.tripData
+                  );
+
+                const cloudUpdatedAt =
+                  this.getCloudUpdatedAt(
+                    cloudDocument
+                  );
+
+                if (
+                  this.tripsAreEqual(
+                    this.trip,
+                    cloudTrip
+                  )
+                ) {
+                  this.syncStatus =
+                    navigator.onLine
+                      ? "已同步"
+                      : "已保存在離線快取";
+
+                  if (
+                    cloudUpdatedAt >
+                    this.lastLocalUpdatedAt
+                  ) {
+                    this.saveLocalDataOnly(
+                      cloudUpdatedAt
+                    );
+                  }
+
+                  return;
+                }
+
+                this.pendingCloudTrip =
+                  cloudTrip;
+
+                this.pendingCloudUpdatedAt =
+                  cloudUpdatedAt;
+
+                this.cloudSyncEnabled =
+                  false;
+
+                this.syncStatus =
+                  "雲端有較新資料";
+              },
+
+              (error) => {
+                console.error(
+                  "Cloud listener failed",
+                  error
+                );
+
+                this.syncStatus =
+                  "同步失敗；本機資料仍安全保存";
+              }
+            );
+        },
+
+        saveTripToCloud(
+          action = "更新行程"
+        ) {
+          if (
+            !window.firebaseBridge ||
+            !this.firebaseUser ||
+            !this.cloudSyncEnabled
+          ) {
+            return;
+          }
+
+          const firebase =
+            window.firebaseBridge;
+
+          const user =
+            firebase.auth.currentUser;
+
+          const tripReference =
+            this.getCloudTripReference();
+
+          if (!user || !tripReference) {
+            return;
+          }
+
+          this.syncStatus =
+            navigator.onLine
+              ? "等待同步"
+              : "離線：等待同步";
+
+          try {
+            const revisionReference =
+              firebase.doc(
+                firebase.collection(
+                  tripReference,
+                  "revisions"
+                )
+              );
+
+            const batch =
+              firebase.writeBatch(
+                firebase.db
+              );
+
+            const tripData =
+              JSON.parse(
+                JSON.stringify(
+                  this.trip
+                )
+              );
+
+            const clientUpdatedAtMs =
+              this.lastLocalUpdatedAt ||
+              Date.now();
+
+            batch.set(
+              tripReference,
+              {
+                tripData,
+
+                updatedAt:
+                  firebase.serverTimestamp(),
+
+                clientUpdatedAtMs,
+
+                updatedBy:
+                  user.uid,
+
+                schemaVersion: 1
+              },
+
+              {
+                merge: true
+              }
+            );
+
+            batch.set(
+              revisionReference,
+              {
+                action,
+                tripData,
+
+                savedAt:
+                  firebase.serverTimestamp(),
+
+                clientSavedAtMs:
+                  clientUpdatedAtMs,
+
+                savedBy:
+                  user.uid,
+
+                schemaVersion: 1
+              }
+            );
+
+            batch.commit().catch(
+              (error) => {
+                console.error(
+                  "Cloud save failed",
+                  error
+                );
+
+                this.syncStatus =
+                  navigator.onLine
+                    ? "同步失敗；本機資料仍安全保存"
+                    : "離線：等待同步";
+              }
+            );
+          } catch (error) {
+            console.error(
+              "Cloud save preparation failed",
+              error
+            );
+
+            this.syncStatus =
+              "同步失敗；本機資料仍安全保存";
           }
         },
 
@@ -1214,7 +2601,9 @@
         },
 
         formatNumber(value) {
-          return (Number(value) || 0).toLocaleString(
+          return (
+            Number(value) || 0
+          ).toLocaleString(
             "en-US",
             {
               minimumFractionDigits: 1,
@@ -1223,12 +2612,18 @@
           );
         },
 
-        convertToBase(amount, currency) {
+        convertToBase(
+          amount,
+          currency
+        ) {
           const rateFrom =
-            this.ratesToHKD[currency] || 1;
+            this.ratesToHKD[currency] ||
+            1;
 
           const rateBase =
-            this.ratesToHKD[this.trip.baseCurrency] || 1;
+            this.ratesToHKD[
+              this.trip.baseCurrency
+            ] || 1;
 
           return (
             Number(amount) *
@@ -1270,12 +2665,16 @@
           }
 
           return Object
-            .values(expense.customShares)
+            .values(
+              expense.customShares
+            )
             .some((value) => {
               return (
                 value !== null &&
                 value !== "" &&
-                !Number.isNaN(Number(value)) &&
+                !Number.isNaN(
+                  Number(value)
+                ) &&
                 Number(value) > 0
               );
             });
@@ -1288,13 +2687,15 @@
 
         generateShareLink() {
           try {
-            const jsonString = JSON.stringify(
-              this.trip
-            );
+            const jsonString =
+              JSON.stringify(this.trip);
 
-            const encoded = btoa(
-              encodeURIComponent(jsonString)
-            );
+            const encoded =
+              btoa(
+                encodeURIComponent(
+                  jsonString
+                )
+              );
 
             const shareUrl =
               window.location.origin +
@@ -1323,9 +2724,8 @@
 
         exportDataCode() {
           try {
-            const jsonString = JSON.stringify(
-              this.trip
-            );
+            const jsonString =
+              JSON.stringify(this.trip);
 
             navigator.clipboard.writeText(
               jsonString
@@ -1347,7 +2747,9 @@
         },
 
         importDataCode() {
-          if (!this.importCodeInput.trim()) {
+          if (
+            !this.importCodeInput.trim()
+          ) {
             return this.showToast(
               "請先貼上資料代碼"
             );
@@ -1361,24 +2763,28 @@
             if (
               parsed &&
               parsed.name &&
-              Array.isArray(parsed.members)
+              Array.isArray(
+                parsed.members
+              )
             ) {
-              const previousTrip = JSON.parse(
-                JSON.stringify(this.trip)
-              );
+              const previousTrip =
+                this.trip;
 
               this.trip = parsed;
 
-              if (!Array.isArray(this.trip.expenses)) {
-                this.trip.expenses = [];
-              }
+              if (
+                !this.saveData(
+                  "匯入文字備份"
+                )
+              ) {
+                this.trip =
+                  previousTrip;
 
-              if (!this.saveData()) {
-                this.trip = previousTrip;
                 return;
               }
 
-              this.showSyncModal = false;
+              this.showSyncModal =
+                false;
 
               this.showToast(
                 "成功匯入並覆蓋資料！"
@@ -1403,93 +2809,118 @@
         get memberBalances() {
           const balances = {};
 
-          this.trip.members.forEach((member) => {
-            balances[member] = 0;
-          });
+          this.trip.members.forEach(
+            (member) => {
+              balances[member] = 0;
+            }
+          );
 
-          this.trip.expenses.forEach((expense) => {
-            const totalAmountBase =
-              this.convertToBase(
-                expense.amount,
-                expense.currency
+          this.trip.expenses.forEach(
+            (expense) => {
+              const totalAmountBase =
+                this.convertToBase(
+                  expense.amount,
+                  expense.currency
+                );
+
+              const participants =
+                expense.participants ||
+                [];
+
+              if (
+                participants.length === 0
+              ) {
+                return;
+              }
+
+              const customShares =
+                expense.customShares ||
+                {};
+
+              let customSum = 0;
+              let unassignedCount = 0;
+
+              participants.forEach(
+                (participant) => {
+                  const value =
+                    Number(
+                      customShares[
+                        participant
+                      ]
+                    );
+
+                  if (
+                    !Number.isNaN(value) &&
+                    value > 0
+                  ) {
+                    customSum += value;
+                  } else {
+                    unassignedCount += 1;
+                  }
+                }
               );
 
-            const participants =
-              expense.participants || [];
-
-            if (participants.length === 0) {
-              return;
-            }
-
-            const customShares =
-              expense.customShares || {};
-
-            let customSum = 0;
-            let unassignedCount = 0;
-
-            participants.forEach(
-              (participant) => {
-                const value = Number(
-                  customShares[participant]
+              const remaining =
+                Math.max(
+                  0,
+                  Number(
+                    expense.amount
+                  ) -
+                  customSum
                 );
 
-                if (
-                  !Number.isNaN(value) &&
-                  value > 0
-                ) {
-                  customSum += value;
-                } else {
-                  unassignedCount += 1;
+              const autoShare =
+                unassignedCount > 0
+                  ? remaining /
+                    unassignedCount
+                  : 0;
+
+              participants.forEach(
+                (participant) => {
+                  const value =
+                    Number(
+                      customShares[
+                        participant
+                      ]
+                    );
+
+                  const participantShareCurrency =
+                    !Number.isNaN(value) &&
+                    value > 0
+                      ? value
+                      : autoShare;
+
+                  const participantShareBase =
+                    this.convertToBase(
+                      participantShareCurrency,
+                      expense.currency
+                    );
+
+                  if (
+                    balances[
+                      participant
+                    ] !== undefined
+                  ) {
+                    balances[
+                      participant
+                    ] -=
+                      participantShareBase;
+                  }
                 }
+              );
+
+              if (
+                balances[
+                  expense.payer
+                ] !== undefined
+              ) {
+                balances[
+                  expense.payer
+                ] +=
+                  totalAmountBase;
               }
-            );
-
-            const remaining = Math.max(
-              0,
-              Number(expense.amount) - customSum
-            );
-
-            const autoShare =
-              unassignedCount > 0
-                ? remaining / unassignedCount
-                : 0;
-
-            participants.forEach(
-              (participant) => {
-                const value = Number(
-                  customShares[participant]
-                );
-
-                const participantShareCurrency =
-                  !Number.isNaN(value) &&
-                  value > 0
-                    ? value
-                    : autoShare;
-
-                const participantShareBase =
-                  this.convertToBase(
-                    participantShareCurrency,
-                    expense.currency
-                  );
-
-                if (
-                  balances[participant] !==
-                  undefined
-                ) {
-                  balances[participant] -=
-                    participantShareBase;
-                }
-              }
-            );
-
-            if (
-              balances[expense.payer] !==
-              undefined
-            ) {
-              balances[expense.payer] +=
-                totalAmountBase;
             }
-          });
+          );
 
           return Object
             .keys(balances)
@@ -1499,50 +2930,44 @@
             }));
         },
 
-        /*
-         * 使用回溯搜尋找出最少轉帳筆數。
-         *
-         * 計算前先把金額轉為整數「分」，
-         * 避免浮點數誤差令本來為零的餘額
-         * 變成很小的小數。
-         */
         get settlementPlan() {
-          const people = this.memberBalances
-            .map((member) => ({
-              name: member.name,
-              amount: Math.round(
-                member.net * 100
-              )
-            }))
-            .filter((member) => {
-              return member.amount !== 0;
-            });
+          const people =
+            this.memberBalances
+              .map((member) => ({
+                name: member.name,
+                amount: Math.round(
+                  member.net * 100
+                )
+              }))
+              .filter((member) => {
+                return member.amount !== 0;
+              });
 
           if (people.length === 0) {
             return [];
           }
 
-          const names = people.map(
-            (person) => person.name
-          );
+          const names =
+            people.map(
+              (person) => person.name
+            );
 
-          const initialBalances = people.map(
-            (person) => person.amount
-          );
+          const initialBalances =
+            people.map(
+              (person) => person.amount
+            );
 
-          /*
-           * 外幣換算及四捨五入後，
-           * 整數分總和偶爾可能相差一兩分。
-           * 將尾差加到絕對餘額最大的成員，
-           * 令總和重新回到零。
-           */
           const roundingDifference =
             initialBalances.reduce(
-              (sum, amount) => sum + amount,
+              (sum, amount) => {
+                return sum + amount;
+              },
               0
             );
 
-          if (roundingDifference !== 0) {
+          if (
+            roundingDifference !== 0
+          ) {
             const adjustmentIndex =
               initialBalances.reduce(
                 (
@@ -1554,7 +2979,9 @@
                   return (
                     Math.abs(amount) >
                     Math.abs(
-                      array[largestIndex]
+                      array[
+                        largestIndex
+                      ]
                     )
                   )
                     ? currentIndex
@@ -1568,158 +2995,202 @@
             ] -= roundingDifference;
           }
 
-          const memo = new Map();
+          const memo =
+            new Map();
 
-          const solve = (balances) => {
-            const firstIndex =
-              balances.findIndex(
-                (amount) => amount !== 0
-              );
+          const solve =
+            (balances) => {
+              const firstIndex =
+                balances.findIndex(
+                  (amount) => {
+                    return amount !== 0;
+                  }
+                );
 
-            if (firstIndex === -1) {
-              return [];
-            }
+              if (firstIndex === -1) {
+                return [];
+              }
 
-            const memoKey =
-              balances.join(",");
+              const memoKey =
+                balances.join(",");
 
-            if (memo.has(memoKey)) {
-              return memo.get(memoKey);
-            }
+              if (memo.has(memoKey)) {
+                return memo.get(
+                  memoKey
+                );
+              }
 
-            let bestPlan = null;
+              let bestPlan = null;
 
-            const triedCounterpartyBalances =
-              new Set();
+              const triedCounterpartyBalances =
+                new Set();
 
-            for (
-              let index = firstIndex + 1;
-              index < balances.length;
-              index += 1
-            ) {
-              /*
-               * 只配對一正一負的餘額。
-               */
-              if (
-                balances[firstIndex] *
+              for (
+                let index =
+                  firstIndex + 1;
+
+                index <
+                  balances.length;
+
+                index += 1
+              ) {
+                if (
+                  balances[
+                    firstIndex
+                  ] *
                   balances[index] >=
-                0
-              ) {
-                continue;
-              }
-
-              /*
-               * 若兩個候選人的餘額完全一樣，
-               * 它們在本次搜尋中的數學效果相同，
-               * 不需要重複搜尋。
-               */
-              if (
-                triedCounterpartyBalances.has(
-                  balances[index]
-                )
-              ) {
-                continue;
-              }
-
-              triedCounterpartyBalances.add(
-                balances[index]
-              );
-
-              const nextBalances = [
-                ...balances
-              ];
-
-              const transferAmount = Math.min(
-                Math.abs(
-                  nextBalances[firstIndex]
-                ),
-                Math.abs(
-                  nextBalances[index]
-                )
-              );
-
-              const transaction =
-                nextBalances[firstIndex] < 0
-                  ? {
-                      from: names[firstIndex],
-                      to: names[index],
-                      amount:
-                        transferAmount / 100
-                    }
-                  : {
-                      from: names[index],
-                      to: names[firstIndex],
-                      amount:
-                        transferAmount / 100
-                    };
-
-              nextBalances[firstIndex] +=
-                nextBalances[firstIndex] < 0
-                  ? transferAmount
-                  : -transferAmount;
-
-              nextBalances[index] +=
-                nextBalances[index] < 0
-                  ? transferAmount
-                  : -transferAmount;
-
-              const remainder = solve(
-                nextBalances
-              );
-
-              if (remainder !== null) {
-                const candidate = [
-                  transaction,
-                  ...remainder
-                ];
+                  0
+                ) {
+                  continue;
+                }
 
                 if (
-                  !bestPlan ||
-                  candidate.length <
-                    bestPlan.length
+                  triedCounterpartyBalances.has(
+                    balances[index]
+                  )
                 ) {
-                  bestPlan = candidate;
+                  continue;
+                }
+
+                triedCounterpartyBalances.add(
+                  balances[index]
+                );
+
+                const nextBalances =
+                  [
+                    ...balances
+                  ];
+
+                const transferAmount =
+                  Math.min(
+                    Math.abs(
+                      nextBalances[
+                        firstIndex
+                      ]
+                    ),
+                    Math.abs(
+                      nextBalances[
+                        index
+                      ]
+                    )
+                  );
+
+                const transaction =
+                  nextBalances[
+                    firstIndex
+                  ] < 0
+                    ? {
+                        from:
+                          names[
+                            firstIndex
+                          ],
+
+                        to:
+                          names[index],
+
+                        amount:
+                          transferAmount /
+                          100
+                      }
+                    : {
+                        from:
+                          names[index],
+
+                        to:
+                          names[
+                            firstIndex
+                          ],
+
+                        amount:
+                          transferAmount /
+                          100
+                      };
+
+                nextBalances[
+                  firstIndex
+                ] +=
+                  nextBalances[
+                    firstIndex
+                  ] < 0
+                    ? transferAmount
+                    : -transferAmount;
+
+                nextBalances[
+                  index
+                ] +=
+                  nextBalances[
+                    index
+                  ] < 0
+                    ? transferAmount
+                    : -transferAmount;
+
+                const remainder =
+                  solve(nextBalances);
+
+                if (
+                  remainder !== null
+                ) {
+                  const candidate = [
+                    transaction,
+                    ...remainder
+                  ];
+
+                  if (
+                    !bestPlan ||
+                    candidate.length <
+                    bestPlan.length
+                  ) {
+                    bestPlan =
+                      candidate;
+                  }
+                }
+
+                if (
+                  Math.abs(
+                    balances[
+                      firstIndex
+                    ]
+                  ) ===
+                  Math.abs(
+                    balances[index]
+                  )
+                ) {
+                  break;
                 }
               }
 
-              /*
-               * 若兩人的餘額剛好互相抵銷，
-               * 這通常是本層最理想配對，
-               * 不需要再測試其他相同層級方案。
-               */
-              if (
-                Math.abs(
-                  balances[firstIndex]
-                ) ===
-                Math.abs(
-                  balances[index]
-                )
-              ) {
-                break;
-              }
-            }
+              memo.set(
+                memoKey,
+                bestPlan
+              );
 
-            memo.set(
-              memoKey,
-              bestPlan
-            );
+              return bestPlan;
+            };
 
-            return bestPlan;
-          };
-
-          return solve(initialBalances) || [];
+          return (
+            solve(
+              initialBalances
+            ) || []
+          );
         },
 
-        openExpenseModal(expense = null) {
+        openExpenseModal(
+          expense = null
+        ) {
           if (expense) {
-            this.formExpense = JSON.parse(
-              JSON.stringify(expense)
-            );
+            this.formExpense =
+              JSON.parse(
+                JSON.stringify(
+                  expense
+                )
+              );
 
             if (
-              !this.formExpense.customShares
+              !this.formExpense
+                .customShares
             ) {
-              this.formExpense.customShares = {};
+              this.formExpense
+                .customShares = {};
             }
           } else {
             this.formExpense = {
@@ -1729,7 +3200,8 @@
               currency:
                 this.trip.baseCurrency,
               payer:
-                this.trip.members[0] || "",
+                this.trip.members[0] ||
+                "",
               category: "餐飲",
               participants: [
                 ...this.trip.members
@@ -1738,7 +3210,8 @@
             };
           }
 
-          this.showExpenseModal = true;
+          this.showExpenseModal =
+            true;
         },
 
         saveExpense() {
@@ -1753,8 +3226,8 @@
           }
 
           if (
-            this.formExpense.participants
-              .length === 0
+            this.formExpense
+              .participants.length === 0
           ) {
             return this.showToast(
               "請選擇參與拆帳成員"
@@ -1763,21 +3236,30 @@
 
           const cleanedShares = {};
 
-          this.formExpense.participants.forEach(
-            (participant) => {
-              if (
-                this.formExpense
-                  .customShares[participant]
-              ) {
-                cleanedShares[participant] =
+          this.formExpense
+            .participants
+            .forEach(
+              (participant) => {
+                if (
                   this.formExpense
-                    .customShares[participant];
+                    .customShares[
+                      participant
+                    ]
+                ) {
+                  cleanedShares[
+                    participant
+                  ] =
+                    this.formExpense
+                      .customShares[
+                        participant
+                      ];
+                }
               }
-            }
-          );
+            );
 
-          this.formExpense.customShares =
-            cleanedShares;
+          this.formExpense
+            .customShares =
+              cleanedShares;
 
           const previousExpenses =
             JSON.parse(
@@ -1786,26 +3268,35 @@
               )
             );
 
-          if (this.formExpense.id) {
+          const isEditing =
+            Boolean(
+              this.formExpense.id
+            );
+
+          if (isEditing) {
             const index =
-              this.trip.expenses.findIndex(
-                (expense) => {
-                  return (
-                    expense.id ===
-                    this.formExpense.id
-                  );
-                }
-              );
+              this.trip.expenses
+                .findIndex(
+                  (expense) => {
+                    return (
+                      expense.id ===
+                      this.formExpense.id
+                    );
+                  }
+                );
 
             if (index !== -1) {
-              this.trip.expenses[index] = {
+              this.trip.expenses[
+                index
+              ] = {
                 ...this.formExpense
               };
             }
           } else {
             const newExpense = {
               ...this.formExpense,
-              id: Date.now().toString()
+              id:
+                Date.now().toString()
             };
 
             this.trip.expenses.unshift(
@@ -1813,17 +3304,21 @@
             );
           }
 
-          /*
-           * 若儲存失敗，立即還原修改前的消費紀錄。
-           */
-          if (!this.saveData()) {
+          if (
+            !this.saveData(
+              isEditing
+                ? "修改消費"
+                : "新增消費"
+            )
+          ) {
             this.trip.expenses =
               previousExpenses;
 
             return;
           }
 
-          this.showExpenseModal = false;
+          this.showExpenseModal =
+            false;
 
           this.showToast(
             "消費紀錄已儲存"
@@ -1832,16 +3327,21 @@
 
         deleteExpense(id) {
           const index =
-            this.trip.expenses.findIndex(
-              (expense) => expense.id === id
-            );
+            this.trip.expenses
+              .findIndex(
+                (expense) => {
+                  return expense.id === id;
+                }
+              );
 
           if (index === -1) {
             return;
           }
 
           const expense =
-            this.trip.expenses[index];
+            this.trip.expenses[
+              index
+            ];
 
           const confirmed =
             window.confirm(
@@ -1864,18 +3364,20 @@
             1
           );
 
-          /*
-           * 刪除後先嘗試保存。
-           * 若保存失敗，立即還原整份紀錄。
-           */
-          if (!this.saveData()) {
+          if (
+            !this.saveData(
+              "刪除消費"
+            )
+          ) {
             this.trip.expenses =
               previousExpenses;
 
             return;
           }
 
-          if (this.undoDelete.timer) {
+          if (
+            this.undoDelete.timer
+          ) {
             clearTimeout(
               this.undoDelete.timer
             );
@@ -1892,22 +3394,32 @@
 
           this.undoDelete.timer =
             setTimeout(() => {
-              this.undoDelete.show = false;
-              this.undoDelete.expense = null;
-              this.undoDelete.index = -1;
-              this.undoDelete.timer = null;
+              this.undoDelete.show =
+                false;
+
+              this.undoDelete.expense =
+                null;
+
+              this.undoDelete.index =
+                -1;
+
+              this.undoDelete.timer =
+                null;
             }, 5000);
         },
 
         undoDeleteExpense() {
-          if (!this.undoDelete.expense) {
+          if (
+            !this.undoDelete.expense
+          ) {
             return;
           }
 
-          const restoreIndex = Math.min(
-            this.undoDelete.index,
-            this.trip.expenses.length
-          );
+          const restoreIndex =
+            Math.min(
+              this.undoDelete.index,
+              this.trip.expenses.length
+            );
 
           this.trip.expenses.splice(
             restoreIndex,
@@ -1915,11 +3427,11 @@
             this.undoDelete.expense
           );
 
-          /*
-           * 若復原後儲存失敗，
-           * 撤回本次復原，避免畫面和儲存資料不一致。
-           */
-          if (!this.saveData()) {
+          if (
+            !this.saveData(
+              "復原已刪除消費"
+            )
+          ) {
             this.trip.expenses.splice(
               restoreIndex,
               1
@@ -1928,7 +3440,9 @@
             return;
           }
 
-          if (this.undoDelete.timer) {
+          if (
+            this.undoDelete.timer
+          ) {
             clearTimeout(
               this.undoDelete.timer
             );
@@ -1948,7 +3462,9 @@
 
         triggerPhotoScan() {
           document
-            .getElementById("receiptInput")
+            .getElementById(
+              "receiptInput"
+            )
             .click();
         },
 
@@ -1960,13 +3476,13 @@
             return;
           }
 
-          /*
-           * 收據圖片最大 10 MB。
-           */
           const maxFileSize =
             10 * 1024 * 1024;
 
-          if (file.size > maxFileSize) {
+          if (
+            file.size >
+            maxFileSize
+          ) {
             event.target.value = "";
 
             return this.showToast(
@@ -1977,22 +3493,21 @@
           const reader =
             new FileReader();
 
-          reader.onload = (
-            loadEvent
-          ) => {
-            this.receiptImage =
-              loadEvent.target.result;
+          reader.onload =
+            (loadEvent) => {
+              this.receiptImage =
+                loadEvent.target.result;
 
-            this.receiptBase64 =
-              loadEvent.target.result
-                .split(",")[1];
+              this.receiptBase64 =
+                loadEvent.target.result
+                  .split(",")[1];
 
-            this.activeTab = "ai";
+              this.activeTab = "ai";
 
-            this.showToast(
-              "相片已載入"
-            );
-          };
+              this.showToast(
+                "相片已載入"
+              );
+            };
 
           reader.onerror = () => {
             this.showToast(
@@ -2004,7 +3519,9 @@
         },
 
         analyzeReceiptWithAI() {
-          if (!this.receiptBase64) {
+          if (
+            !this.receiptBase64
+          ) {
             return this.showToast(
               "請先拍攝或選擇照片"
             );
@@ -2013,7 +3530,8 @@
           this.visionLoading = true;
 
           setTimeout(() => {
-            this.visionLoading = false;
+            this.visionLoading =
+              false;
 
             this.formExpense = {
               id: null,
@@ -2022,7 +3540,8 @@
               amount: 1480,
               currency: "JPY",
               payer:
-                this.trip.members[0] || "",
+                this.trip.members[0] ||
+                "",
               category: "餐飲",
               participants: [
                 ...this.trip.members
@@ -2030,7 +3549,8 @@
               customShares: {}
             };
 
-            this.showExpenseModal = true;
+            this.showExpenseModal =
+              true;
 
             this.showToast(
               "AI 圖片辨識完成！"
@@ -2062,13 +3582,17 @@
               participants:
                 this.trip.members.filter(
                   (member) => {
-                    return member !== "阿美";
+                    return (
+                      member !== "阿美"
+                    );
                   }
                 ),
               customShares: {}
             };
 
-            this.showExpenseModal = true;
+            this.showExpenseModal =
+              true;
+
             this.aiPromptText = "";
 
             this.showToast(
@@ -2090,7 +3614,8 @@
             `轉帳建議方案：\n`;
 
           if (
-            this.settlementPlan.length === 0
+            this.settlementPlan.length ===
+            0
           ) {
             text +=
               "大家都算清囉！無須轉帳。";
@@ -2127,11 +3652,6 @@
             ]
           };
 
-          /*
-           * 保存每個輸入框原本對應的成員姓名。
-           * 即使使用者在輸入框改名，仍可知道
-           * 哪一位舊成員被改成甚麼名稱。
-           */
           this.tempOriginalMembers = [
             ...this.trip.members
           ];
@@ -2146,18 +3666,13 @@
 
           if (
             name &&
-            !this.tempTrip.members.includes(
-              name
-            )
+            !this.tempTrip.members
+              .includes(name)
           ) {
             this.tempTrip.members.push(
               name
             );
 
-            /*
-             * 新增成員沒有舊名稱，
-             * 因此對應位置保存 null。
-             */
             this.tempOriginalMembers.push(
               null
             );
@@ -2168,7 +3683,8 @@
 
         removeMemberFromTemp(index) {
           if (
-            this.tempTrip.members.length <= 1
+            this.tempTrip.members.length <=
+            1
           ) {
             return this.showToast(
               "至少需保留一位成員"
@@ -2176,15 +3692,10 @@
           }
 
           const originalName =
-            this.tempOriginalMembers[index];
+            this.tempOriginalMembers[
+              index
+            ];
 
-          /*
-           * 已經存在於任何舊帳目的成員，
-           * 不允許直接刪除。
-           *
-           * 這可避免舊帳目的付款人或參與者
-           * 從成員名單消失而令結算錯誤。
-           */
           if (originalName) {
             const isReferenced =
               this.trip.expenses.some(
@@ -2192,12 +3703,14 @@
                   return (
                     expense.payer ===
                       originalName ||
+
                     (
                       expense.participants ||
                       []
                     ).includes(
                       originalName
                     ) ||
+
                     Object.prototype
                       .hasOwnProperty.call(
                         expense.customShares ||
@@ -2237,7 +3750,9 @@
 
           const cleanedMembers =
             this.tempTrip.members.map(
-              (name) => name.trim()
+              (name) => {
+                return name.trim();
+              }
             );
 
           if (
@@ -2251,7 +3766,9 @@
           }
 
           if (
-            new Set(cleanedMembers).size !==
+            new Set(
+              cleanedMembers
+            ).size !==
             cleanedMembers.length
           ) {
             return this.showToast(
@@ -2259,50 +3776,52 @@
             );
           }
 
-          /*
-           * 建立舊姓名 → 新姓名的改名表。
-           */
           const renameMap = {};
 
-          this.tempOriginalMembers.forEach(
-            (
-              originalName,
-              index
-            ) => {
-              if (
-                originalName &&
-                originalName !==
-                  cleanedMembers[index]
-              ) {
-                renameMap[originalName] =
-                  cleanedMembers[index];
+          this.tempOriginalMembers
+            .forEach(
+              (
+                originalName,
+                index
+              ) => {
+                if (
+                  originalName &&
+                  originalName !==
+                    cleanedMembers[
+                      index
+                    ]
+                ) {
+                  renameMap[
+                    originalName
+                  ] =
+                    cleanedMembers[
+                      index
+                    ];
+                }
               }
-            }
-          );
+            );
 
           const previousTrip =
             JSON.parse(
-              JSON.stringify(this.trip)
+              JSON.stringify(
+                this.trip
+              )
             );
 
-          /*
-           * 成員改名時，同步修改所有舊帳目的：
-           *
-           * 1. 付款人；
-           * 2. 參與拆帳成員；
-           * 3. 指定金額的姓名鍵值。
-           */
           this.trip.expenses =
             this.trip.expenses.map(
               (expense) => {
-                const renamedShares = {};
+                const renamedShares =
+                  {};
 
                 Object.entries(
-                  expense.customShares || {}
+                  expense.customShares ||
+                    {}
                 ).forEach(
                   ([name, value]) => {
                     renamedShares[
-                      renameMap[name] || name
+                      renameMap[name] ||
+                      name
                     ] = value;
                   }
                 );
@@ -2344,17 +3863,19 @@
           this.trip.members =
             cleanedMembers;
 
-          /*
-           * 儲存失敗時，還原整個行程資料。
-           */
-          if (!this.saveData()) {
+          if (
+            !this.saveData(
+              "修改行程設定"
+            )
+          ) {
             this.trip =
               previousTrip;
 
             return;
           }
 
-          this.showTripModal = false;
+          this.showTripModal =
+            false;
 
           this.showToast(
             "行程設定已更新"
