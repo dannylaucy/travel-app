@@ -4,316 +4,881 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>旅遊記帳與拆帳小幫手</title>
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+
   <!-- Alpine.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+
   <style>
-    [x-cloak] { display: none !important; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    [x-cloak] {
+      display: none !important;
+    }
+
+    body {
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+    }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen pb-12" x-data="expenseApp" x-cloak>
+
+<body
+  class="bg-slate-50 text-slate-800 min-h-screen pb-12"
+  x-data="expenseApp"
+  x-cloak
+>
 
   <!-- 頂部導航列 -->
   <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-30">
     <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+
       <div class="flex items-center space-x-2">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          ></path>
+        </svg>
+
         <div>
-          <h1 class="font-bold text-lg leading-tight" x-text="trip.name"></h1>
-          <p class="text-xs text-indigo-200" x-text="'本位幣：' + trip.baseCurrency + ' | 成員 ' + trip.members.length + ' 人'"></p>
+          <h1
+            class="font-bold text-lg leading-tight"
+            x-text="trip.name"
+          ></h1>
+
+          <p
+            class="text-xs text-indigo-200"
+            x-text="'本位幣：' + trip.baseCurrency + ' | 成員 ' + trip.members.length + ' 人'"
+          ></p>
         </div>
       </div>
+
       <div class="flex items-center gap-1.5">
-        <button @click="openSyncModal()" class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
+        <button
+          @click="openSyncModal()"
+          class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1"
+        >
           📲 同步/備份
         </button>
-        <button @click="openTripSettings()" class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
+
+        <button
+          @click="openTripSettings()"
+          class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1"
+        >
           ⚙️ 設定
         </button>
       </div>
+
     </div>
   </header>
 
   <!-- 主內容區塊 -->
   <main class="max-w-md mx-auto px-4 mt-4 space-y-4">
 
-    <!-- 頁籤分頁 -->
+    <!-- 頁籤 -->
     <div class="flex bg-slate-200 p-1 rounded-xl text-sm font-medium">
-      <button @click="activeTab = 'expenses'" :class="activeTab === 'expenses' ? 'bg-white text-indigo-600 shadow' : 'text-slate-600'" class="flex-1 py-2 text-center rounded-lg transition">消費明細</button>
-      <button @click="activeTab = 'settlement'" :class="activeTab === 'settlement' ? 'bg-white text-indigo-600 shadow' : 'text-slate-600'" class="flex-1 py-2 text-center rounded-lg transition">結算方案</button>
-      <button @click="activeTab = 'ai'" :class="activeTab === 'ai' ? 'bg-white text-indigo-600 shadow' : 'text-slate-600'" class="flex-1 py-2 text-center rounded-lg transition">🤖 AI 助手</button>
+
+      <button
+        @click="activeTab = 'expenses'"
+        :class="activeTab === 'expenses'
+          ? 'bg-white text-indigo-600 shadow'
+          : 'text-slate-600'"
+        class="flex-1 py-2 text-center rounded-lg transition"
+      >
+        消費明細
+      </button>
+
+      <button
+        @click="activeTab = 'settlement'"
+        :class="activeTab === 'settlement'
+          ? 'bg-white text-indigo-600 shadow'
+          : 'text-slate-600'"
+        class="flex-1 py-2 text-center rounded-lg transition"
+      >
+        結算方案
+      </button>
+
+      <button
+        @click="activeTab = 'ai'"
+        :class="activeTab === 'ai'
+          ? 'bg-white text-indigo-600 shadow'
+          : 'text-slate-600'"
+        class="flex-1 py-2 text-center rounded-lg transition"
+      >
+        🤖 AI 助手
+      </button>
+
     </div>
 
-    <!-- 頁籤 1: 消費明細列表 -->
-    <div x-show="activeTab === 'expenses'" class="space-y-4">
+    <!-- 消費明細 -->
+    <div
+      x-show="activeTab === 'expenses'"
+      class="space-y-4"
+    >
+
       <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
-        <div class="text-xs text-indigo-100">行程總消費估計</div>
-        <div class="text-3xl font-extrabold mt-1" x-text="trip.baseCurrency + ' $' + formatNumber(calculateTotalTripBase())"></div>
+
+        <div class="text-xs text-indigo-100">
+          行程總消費估計
+        </div>
+
+        <div
+          class="text-3xl font-extrabold mt-1"
+          x-text="trip.baseCurrency + ' $' + formatNumber(calculateTotalTripBase())"
+        ></div>
+
         <div class="text-xs text-indigo-100 mt-2 flex justify-between">
-          <span>共 <strong x-text="trip.expenses.length"></strong> 筆消費紀錄</span>
-          <span>人均：<strong x-text="trip.baseCurrency + ' $' + formatNumber(calculateTotalTripBase() / (trip.members.length || 1))"></strong></span>
+
+          <span>
+            共
+            <strong x-text="trip.expenses.length"></strong>
+            筆消費紀錄
+          </span>
+
+          <span>
+            人均：
+            <strong
+              x-text="trip.baseCurrency + ' $' +
+                formatNumber(
+                  calculateTotalTripBase() /
+                  (trip.members.length || 1)
+                )"
+            ></strong>
+          </span>
+
         </div>
       </div>
 
       <div class="flex gap-2">
-        <button @click="openExpenseModal()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-xl shadow flex items-center justify-center gap-1.5 transition">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+
+        <button
+          @click="openExpenseModal()"
+          class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-xl shadow flex items-center justify-center gap-1.5 transition"
+        >
+          <svg
+            class="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            ></path>
+          </svg>
+
           新增消費紀錄
         </button>
-        <button @click="triggerPhotoScan()" class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2.5 rounded-xl shadow flex items-center gap-1 transition">
+
+        <button
+          @click="triggerPhotoScan()"
+          class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2.5 rounded-xl shadow flex items-center gap-1 transition"
+        >
           📷 掃描收據
         </button>
+
       </div>
 
       <div class="space-y-2">
+
         <template x-if="trip.expenses.length === 0">
           <div class="bg-white rounded-xl p-8 text-center text-slate-400 border border-slate-200">
             尚無消費紀錄，點擊上方按鈕新增！
           </div>
         </template>
 
-        <template x-for="(exp, index) in trip.expenses" :key="exp.id || index">
+        <template
+          x-for="(exp, index) in trip.expenses"
+          :key="exp.id || index"
+        >
           <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+
             <div class="flex items-center space-x-3">
-              <div class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm" x-text="getCategoryEmoji(exp.category)"></div>
+
+              <div
+                class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm"
+                x-text="getCategoryEmoji(exp.category)"
+              ></div>
+
               <div>
-                <div class="font-bold text-slate-800 text-sm" x-text="exp.title"></div>
+
+                <div
+                  class="font-bold text-slate-800 text-sm"
+                  x-text="exp.title"
+                ></div>
+
                 <div class="text-xs text-slate-500 mt-0.5">
-                  <span class="text-indigo-600 font-medium" x-text="exp.payer"></span> 付款
+
+                  <span
+                    class="text-indigo-600 font-medium"
+                    x-text="exp.payer"
+                  ></span>
+
+                  付款
+
                   <span class="text-slate-300">|</span>
-                  <span x-text="exp.participants.length + ' 人分攤' + (hasCustomShares(exp) ? ' (含指定金額)' : '')"></span>
+
+                  <span
+                    x-text="
+                      exp.participants.length +
+                      ' 人分攤' +
+                      (
+                        hasCustomShares(exp)
+                          ? ' (含指定金額)'
+                          : ''
+                      )
+                    "
+                  ></span>
+
                 </div>
               </div>
             </div>
+
             <div class="text-right">
-              <div class="font-bold text-slate-800" x-text="exp.currency + ' $' + formatNumber(exp.amount)"></div>
-              <div class="text-xs text-slate-400" x-show="exp.currency !== trip.baseCurrency" x-text="'≈ ' + trip.baseCurrency + ' $' + formatNumber(convertToBase(exp.amount, exp.currency))"></div>
+
+              <div
+                class="font-bold text-slate-800"
+                x-text="
+                  exp.currency +
+                  ' $' +
+                  formatNumber(exp.amount)
+                "
+              ></div>
+
+              <div
+                class="text-xs text-slate-400"
+                x-show="exp.currency !== trip.baseCurrency"
+                x-text="
+                  '≈ ' +
+                  trip.baseCurrency +
+                  ' $' +
+                  formatNumber(
+                    convertToBase(
+                      exp.amount,
+                      exp.currency
+                    )
+                  )
+                "
+              ></div>
+
               <div class="flex justify-end gap-2 mt-1">
-                <button @click="openExpenseModal(exp)" class="text-xs text-indigo-600 hover:underline">編輯</button>
-                <button @click="deleteExpense(exp.id)" class="text-xs text-rose-500 hover:underline">刪除</button>
+
+                <button
+                  @click="openExpenseModal(exp)"
+                  class="text-xs text-indigo-600 hover:underline"
+                >
+                  編輯
+                </button>
+
+                <button
+                  @click="deleteExpense(exp.id)"
+                  class="text-xs text-rose-500 hover:underline"
+                >
+                  刪除
+                </button>
+
               </div>
             </div>
+
           </div>
         </template>
+
       </div>
     </div>
 
-    <!-- 頁籤 2: 最佳化拆帳結算 -->
-    <div x-show="activeTab === 'settlement'" class="space-y-4">
+    <!-- 結算方案 -->
+    <div
+      x-show="activeTab === 'settlement'"
+      class="space-y-4"
+    >
+
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <h2 class="font-bold text-slate-800 text-base mb-1">成員個人收支狀態</h2>
-        <p class="text-xs text-slate-500 mb-3">正數 (+) 為應收回款項，負數 (-) 為應補繳款項。</p>
+
+        <h2 class="font-bold text-slate-800 text-base mb-1">
+          成員個人收支狀態
+        </h2>
+
+        <p class="text-xs text-slate-500 mb-3">
+          正數 (+) 為應收回款項，負數 (-) 為應補繳款項。
+        </p>
+
         <div class="space-y-2">
-          <template x-for="m in memberBalances" :key="m.name">
+
+          <template
+            x-for="m in memberBalances"
+            :key="m.name"
+          >
             <div class="flex justify-between items-center py-2 border-b border-slate-100 last:border-0 text-sm">
-              <span class="font-medium text-slate-700" x-text="m.name"></span>
+
+              <span
+                class="font-medium text-slate-700"
+                x-text="m.name"
+              ></span>
+
               <div class="text-right">
-                <span :class="m.net >= 0 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'"
-                      x-text="(m.net >= 0 ? '+' : '') + trip.baseCurrency + ' $' + formatNumber(m.net)"></span>
+                <span
+                  :class="
+                    m.net >= 0
+                      ? 'text-emerald-600 font-bold'
+                      : 'text-rose-600 font-bold'
+                  "
+                  x-text="
+                    (m.net >= 0 ? '+' : '') +
+                    trip.baseCurrency +
+                    ' $' +
+                    formatNumber(m.net)
+                  "
+                ></span>
               </div>
+
             </div>
           </template>
+
         </div>
       </div>
 
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+
         <div class="flex justify-between items-center">
-          <h2 class="font-bold text-slate-800 text-base">最佳化簡化轉帳方案</h2>
-          <button @click="copySettlementReport()" class="text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md font-medium transition">一鍵複製文字</button>
+
+          <h2 class="font-bold text-slate-800 text-base">
+            最佳化簡化轉帳方案
+          </h2>
+
+          <button
+            @click="copySettlementReport()"
+            class="text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md font-medium transition"
+          >
+            一鍵複製文字
+          </button>
+
         </div>
 
         <template x-if="settlementPlan.length === 0">
-          <p class="text-slate-400 text-sm text-center py-4">帳目已完全平算，無需再轉帳！🎉</p>
+          <p class="text-slate-400 text-sm text-center py-4">
+            帳目已完全平算，無需再轉帳！🎉
+          </p>
         </template>
 
         <div class="space-y-2">
-          <template x-for="(plan, idx) in settlementPlan" :key="idx">
+
+          <template
+            x-for="(plan, idx) in settlementPlan"
+            :key="idx"
+          >
             <div class="bg-indigo-50/60 p-3 rounded-lg border border-indigo-100 flex items-center justify-between text-sm">
+
               <div class="flex items-center space-x-2">
-                <span class="font-bold text-slate-800" x-text="plan.from"></span>
+
+                <span
+                  class="font-bold text-slate-800"
+                  x-text="plan.from"
+                ></span>
+
                 <span class="text-slate-400">➔</span>
-                <span class="font-bold text-slate-800" x-text="plan.to"></span>
+
+                <span
+                  class="font-bold text-slate-800"
+                  x-text="plan.to"
+                ></span>
+
               </div>
-              <div class="font-extrabold text-indigo-700" x-text="trip.baseCurrency + ' $' + formatNumber(plan.amount)"></div>
+
+              <div
+                class="font-extrabold text-indigo-700"
+                x-text="
+                  trip.baseCurrency +
+                  ' $' +
+                  formatNumber(plan.amount)
+                "
+              ></div>
+
             </div>
           </template>
+
         </div>
       </div>
+
     </div>
 
-    <!-- 頁籤 3: AI 智慧助手 -->
-    <div x-show="activeTab === 'ai'" class="space-y-4">
+    <!-- AI 助手 -->
+    <div
+      x-show="activeTab === 'ai'"
+      class="space-y-4"
+    >
+
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+
         <h2 class="font-bold text-slate-800 text-base flex items-center gap-1.5">
           📸 AI 拍照/相簿收據自動辨識 (Vision)
         </h2>
-        <p class="text-xs text-slate-500">拍照或上傳相簿收據，AI 自動萃取金額與細節。</p>
-        
-        <!-- 已移除 capture 屬性，開啟標準相簿/相機選擇選單 -->
-        <input type="file" id="receiptInput" accept="image/*" @change="handleReceiptUpload($event)" class="hidden">
-        
-        <div @click="triggerPhotoScan()" class="border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl p-4 text-center cursor-pointer bg-indigo-50/50 transition">
+
+        <p class="text-xs text-slate-500">
+          拍照或上傳相簿收據，AI 自動萃取金額與細節。圖片大小上限 10 MB。
+        </p>
+
+        <input
+          type="file"
+          id="receiptInput"
+          accept="image/*"
+          @change="handleReceiptUpload($event)"
+          class="hidden"
+        >
+
+        <div
+          @click="triggerPhotoScan()"
+          class="border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl p-4 text-center cursor-pointer bg-indigo-50/50 transition"
+        >
+
           <template x-if="!receiptImage">
             <div>
-              <div class="text-3xl mb-1">🖼️ / 📷</div>
-              <div class="text-xs font-semibold text-indigo-600">點擊選擇相簿照片或拍照</div>
+              <div class="text-3xl mb-1">
+                🖼️ / 📷
+              </div>
+
+              <div class="text-xs font-semibold text-indigo-600">
+                點擊選擇相簿照片或拍照
+              </div>
             </div>
           </template>
+
           <template x-if="receiptImage">
             <div class="space-y-2">
-              <img :src="receiptImage" class="max-h-40 mx-auto rounded-lg shadow-sm border">
-              <div class="text-xs text-indigo-600 font-medium">點擊更換照片</div>
+
+              <img
+                :src="receiptImage"
+                class="max-h-40 mx-auto rounded-lg shadow-sm border"
+              >
+
+              <div class="text-xs text-indigo-600 font-medium">
+                點擊更換照片
+              </div>
+
             </div>
           </template>
+
         </div>
 
-        <button @click="analyzeReceiptWithAI()" :disabled="!receiptImage || visionLoading" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 rounded-lg text-sm transition disabled:opacity-50">
-          <span x-show="!visionLoading">開始 AI 圖像辨識填單</span>
-          <span x-show="visionLoading">AI 辨識收據中...</span>
+        <button
+          @click="analyzeReceiptWithAI()"
+          :disabled="!receiptImage || visionLoading"
+          class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 rounded-lg text-sm transition disabled:opacity-50"
+        >
+
+          <span x-show="!visionLoading">
+            開始 AI 圖像辨識填單
+          </span>
+
+          <span x-show="visionLoading">
+            AI 辨識收據中...
+          </span>
+
         </button>
+
       </div>
 
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+
         <h2 class="font-bold text-slate-800 text-base flex items-center gap-1.5">
           🗣️ AI 快速對話記帳
         </h2>
-        <textarea x-model="aiPromptText" rows="2" placeholder="輸入描述，例如：昨天小明幫大家付了拉麵 12000 日圓，阿美沒吃" class="w-full text-sm p-2.5 border rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
-        <button @click="parseExpenseWithAI()" :disabled="aiLoading" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm transition disabled:opacity-50">
-          <span x-show="!aiLoading">AI 解析文字填單</span>
-          <span x-show="aiLoading">AI 解析中...</span>
+
+        <textarea
+          x-model="aiPromptText"
+          rows="2"
+          placeholder="輸入描述，例如：昨天小明幫大家付了拉麵 12000 日圓，阿美沒吃"
+          class="w-full text-sm p-2.5 border rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
+        ></textarea>
+
+        <button
+          @click="parseExpenseWithAI()"
+          :disabled="aiLoading"
+          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm transition disabled:opacity-50"
+        >
+
+          <span x-show="!aiLoading">
+            AI 解析文字填單
+          </span>
+
+          <span x-show="aiLoading">
+            AI 解析中...
+          </span>
+
         </button>
+
       </div>
+
     </div>
 
   </main>
 
-  <!-- 彈窗 1：跨裝置同步與備份 -->
-  <div x-show="showSyncModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <!-- 跨裝置同步與備份彈窗 -->
+  <div
+    x-show="showSyncModal"
+    class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+  >
+
     <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
+
       <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="font-bold text-slate-800 text-lg">📲 跨裝置資料同步 / 備份</h3>
-        <button @click="showSyncModal = false" class="text-slate-400">✕</button>
+
+        <h3 class="font-bold text-slate-800 text-lg">
+          📲 跨裝置資料同步 / 備份
+        </h3>
+
+        <button
+          @click="showSyncModal = false"
+          class="text-slate-400"
+        >
+          ✕
+        </button>
+
       </div>
 
       <div class="space-y-3 text-sm">
+
         <p class="text-xs text-slate-500 leading-relaxed">
           由於這是免費靜態網頁，資料預設儲存於本手機瀏覽器。如需切換瀏覽器或發給同行朋友同步，請使用下方功能：
         </p>
 
         <div class="space-y-2 pt-1">
-          <button @click="generateShareLink()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 transition">
-            🔗 複製一鍵同步網址 (發到 LINE 群組)
+
+          <button
+            @click="generateShareLink()"
+            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 transition"
+          >
+            🔗 複製一鍵同步網址（發到 LINE 群組）
           </button>
-          <button @click="exportDataCode()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium text-xs transition">
-            📋 複製資料文字代碼 (備份)
+
+          <button
+            @click="exportDataCode()"
+            class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium text-xs transition"
+          >
+            📋 複製資料文字代碼（備份）
           </button>
+
         </div>
 
         <div class="border-t pt-3">
-          <label class="block text-xs font-semibold text-slate-600 mb-1">匯入其他裝置的資料</label>
-          <textarea x-model="importCodeInput" rows="3" placeholder="貼上從其他裝置複製的資料代碼..." class="w-full text-xs p-2 border rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
-          <button @click="importDataCode()" class="w-full mt-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium text-xs transition">
+
+          <label class="block text-xs font-semibold text-slate-600 mb-1">
+            匯入其他裝置的資料
+          </label>
+
+          <textarea
+            x-model="importCodeInput"
+            rows="3"
+            placeholder="貼上從其他裝置複製的資料代碼..."
+            class="w-full text-xs p-2 border rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
+          ></textarea>
+
+          <button
+            @click="importDataCode()"
+            class="w-full mt-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium text-xs transition"
+          >
             📥 覆蓋並匯入資料
           </button>
+
         </div>
+
       </div>
 
       <div class="flex justify-end border-t pt-2">
-        <button @click="showSyncModal = false" class="px-4 py-1.5 text-xs font-medium text-slate-600">關閉</button>
+
+        <button
+          @click="showSyncModal = false"
+          class="px-4 py-1.5 text-xs font-medium text-slate-600"
+        >
+          關閉
+        </button>
+
       </div>
+
     </div>
   </div>
 
-  <!-- 彈窗 2：行程設定 -->
-  <div x-show="showTripModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <!-- 行程設定彈窗 -->
+  <div
+    x-show="showTripModal"
+    class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+  >
+
     <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
+
       <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="font-bold text-slate-800 text-lg">行程與成員設定</h3>
-        <button @click="showTripModal = false" class="text-slate-400">✕</button>
+
+        <h3 class="font-bold text-slate-800 text-lg">
+          行程與成員設定
+        </h3>
+
+        <button
+          @click="showTripModal = false"
+          class="text-slate-400"
+        >
+          ✕
+        </button>
+
       </div>
 
       <div class="space-y-3">
+
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">行程名稱</label>
-          <input type="text" x-model="tempTrip.name" class="w-full text-sm border p-2 rounded-lg outline-none">
+
+          <label class="block text-xs font-semibold text-slate-600 mb-1">
+            行程名稱
+          </label>
+
+          <input
+            type="text"
+            x-model="tempTrip.name"
+            class="w-full text-sm border p-2 rounded-lg outline-none"
+          >
+
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">預設本位幣</label>
-          <select x-model="tempTrip.baseCurrency" class="w-full text-sm border p-2 rounded-lg bg-white">
-            <template x-for="c in currencies" :key="c">
-              <option :value="c" x-text="c"></option>
+
+          <label class="block text-xs font-semibold text-slate-600 mb-1">
+            預設本位幣
+          </label>
+
+          <select
+            x-model="tempTrip.baseCurrency"
+            class="w-full text-sm border p-2 rounded-lg bg-white"
+          >
+
+            <template
+              x-for="c in currencies"
+              :key="c"
+            >
+              <option
+                :value="c"
+                x-text="c"
+              ></option>
             </template>
+
           </select>
+
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">旅行成員名單</label>
+
+          <label class="block text-xs font-semibold text-slate-600 mb-1">
+            旅行成員名單
+          </label>
+
           <div class="space-y-2 max-h-36 overflow-y-auto p-1">
-            <template x-for="(m, idx) in tempTrip.members" :key="idx">
+
+            <template
+              x-for="(m, idx) in tempTrip.members"
+              :key="idx"
+            >
               <div class="flex items-center space-x-2">
-                <input type="text" x-model="tempTrip.members[idx]" class="flex-1 text-sm border p-1.5 rounded-md">
-                <button @click="removeMemberFromTemp(idx)" class="text-rose-500 text-xs px-2 py-1">刪除</button>
+
+                <input
+                  type="text"
+                  x-model="tempTrip.members[idx]"
+                  class="flex-1 text-sm border p-1.5 rounded-md"
+                >
+
+                <button
+                  @click="removeMemberFromTemp(idx)"
+                  class="text-rose-500 text-xs px-2 py-1"
+                >
+                  刪除
+                </button>
+
               </div>
             </template>
+
           </div>
+
           <div class="flex gap-2 mt-2">
-            <input type="text" x-model="newMemberName" placeholder="新成員姓名..." class="flex-1 text-sm border p-1.5 rounded-md">
-            <button @click="addMemberToTemp()" class="bg-indigo-50 text-indigo-600 font-medium px-3 text-xs rounded-md">＋ 新增</button>
+
+            <input
+              type="text"
+              x-model="newMemberName"
+              placeholder="新成員姓名..."
+              class="flex-1 text-sm border p-1.5 rounded-md"
+            >
+
+            <button
+              @click="addMemberToTemp()"
+              class="bg-indigo-50 text-indigo-600 font-medium px-3 text-xs rounded-md"
+            >
+              ＋ 新增
+            </button>
+
           </div>
+
         </div>
+
       </div>
 
       <div class="flex justify-end gap-2 pt-2 border-t">
-        <button @click="showTripModal = false" class="px-4 py-2 text-xs font-medium text-slate-600">取消</button>
-        <button @click="saveTripSettings()" class="px-4 py-2 text-xs font-medium bg-indigo-600 text-white rounded-lg">儲存設定</button>
+
+        <button
+          @click="showTripModal = false"
+          class="px-4 py-2 text-xs font-medium text-slate-600"
+        >
+          取消
+        </button>
+
+        <button
+          @click="saveTripSettings()"
+          class="px-4 py-2 text-xs font-medium bg-indigo-600 text-white rounded-lg"
+        >
+          儲存設定
+        </button>
+
       </div>
+
     </div>
   </div>
 
-  <!-- 彈窗 3：新增/編輯消費 -->
-  <div x-show="showExpenseModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <!-- 新增／編輯消費彈窗 -->
+  <div
+    x-show="showExpenseModal"
+    class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+  >
+
     <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
+
       <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="font-bold text-slate-800 text-lg" x-text="formExpense.id ? '編輯消費紀錄' : '新增消費紀錄'"></h3>
-        <button @click="showExpenseModal = false" class="text-slate-400">✕</button>
+
+        <h3
+          class="font-bold text-slate-800 text-lg"
+          x-text="
+            formExpense.id
+              ? '編輯消費紀錄'
+              : '新增消費紀錄'
+          "
+        ></h3>
+
+        <button
+          @click="showExpenseModal = false"
+          class="text-slate-400"
+        >
+          ✕
+        </button>
+
       </div>
 
       <div class="space-y-3 text-sm">
+
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">消費項目/名稱</label>
-          <input type="text" x-model="formExpense.title" placeholder="例如：晚餐、計程車" class="w-full border p-2 rounded-lg">
+
+          <label class="block text-xs font-semibold text-slate-600 mb-1">
+            消費項目／名稱
+          </label>
+
+          <input
+            type="text"
+            x-model="formExpense.title"
+            placeholder="例如：晚餐、計程車"
+            class="w-full border p-2 rounded-lg"
+          >
+
         </div>
 
         <div class="grid grid-cols-2 gap-2">
+
           <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">總金額</label>
-            <input type="number" step="any" x-model.number="formExpense.amount" placeholder="0.00" class="w-full border p-2 rounded-lg">
+
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+              總金額
+            </label>
+
+            <input
+              type="number"
+              step="any"
+              x-model.number="formExpense.amount"
+              placeholder="0.00"
+              class="w-full border p-2 rounded-lg"
+            >
+
           </div>
+
           <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">幣別</label>
-            <select x-model="formExpense.currency" class="w-full border p-2 rounded-lg bg-white">
-              <template x-for="c in currencies" :key="c">
-                <option :value="c" x-text="c"></option>
+
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+              幣別
+            </label>
+
+            <select
+              x-model="formExpense.currency"
+              class="w-full border p-2 rounded-lg bg-white"
+            >
+
+              <template
+                x-for="c in currencies"
+                :key="c"
+              >
+                <option
+                  :value="c"
+                  x-text="c"
+                ></option>
               </template>
+
             </select>
+
           </div>
+
         </div>
 
         <div class="grid grid-cols-2 gap-2">
+
           <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">先墊付款人</label>
-            <select x-model="formExpense.payer" class="w-full border p-2 rounded-lg bg-white">
-              <template x-for="m in trip.members" :key="m">
-                <option :value="m" x-text="m"></option>
+
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+              先墊付款人
+            </label>
+
+            <select
+              x-model="formExpense.payer"
+              class="w-full border p-2 rounded-lg bg-white"
+            >
+
+              <template
+                x-for="m in trip.members"
+                :key="m"
+              >
+                <option
+                  :value="m"
+                  x-text="m"
+                ></option>
               </template>
+
             </select>
+
           </div>
+
           <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">類別</label>
-            <select x-model="formExpense.category" class="w-full border p-2 rounded-lg bg-white">
+
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+              類別
+            </label>
+
+            <select
+              x-model="formExpense.category"
+              class="w-full border p-2 rounded-lg bg-white"
+            >
               <option value="餐飲">🍱 餐飲</option>
               <option value="住宿">🏨 住宿</option>
               <option value="交通">🚗 交通</option>
@@ -321,385 +886,1484 @@
               <option value="娛樂">🎟️ 娛樂</option>
               <option value="其他">💡 其他</option>
             </select>
+
           </div>
+
         </div>
 
         <!-- 拆帳分配區 -->
         <div>
+
           <div class="flex justify-between items-center mb-1">
-            <label class="text-xs font-semibold text-slate-600">參與拆帳成員與金額分配</label>
-            <span class="text-[10px] text-slate-400">未填金額者將自動平分剩餘數額</span>
+
+            <label class="text-xs font-semibold text-slate-600">
+              參與拆帳成員與金額分配
+            </label>
+
+            <span class="text-[10px] text-slate-400">
+              未填金額者將自動平分剩餘數額
+            </span>
+
           </div>
+
           <div class="space-y-2 border p-2.5 rounded-lg max-h-48 overflow-y-auto bg-slate-50/50">
-            <template x-for="m in trip.members" :key="m">
+
+            <template
+              x-for="m in trip.members"
+              :key="m"
+            >
               <div class="flex items-center justify-between gap-2 text-xs bg-white p-1.5 rounded border border-slate-100">
+
                 <label class="flex items-center space-x-2 cursor-pointer flex-1">
-                  <input type="checkbox" :value="m" x-model="formExpense.participants" class="rounded text-indigo-600">
-                  <span class="font-medium text-slate-700" x-text="m"></span>
+
+                  <input
+                    type="checkbox"
+                    :value="m"
+                    x-model="formExpense.participants"
+                    class="rounded text-indigo-600"
+                  >
+
+                  <span
+                    class="font-medium text-slate-700"
+                    x-text="m"
+                  ></span>
+
                 </label>
-                <div class="flex items-center space-x-1" x-show="formExpense.participants.includes(m)">
-                  <span class="text-[10px] text-slate-400">指定:</span>
-                  <input type="number" step="any" placeholder="自動平分" 
-                         x-model.number="formExpense.customShares[m]" 
-                         class="w-20 text-right border rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500">
+
+                <div
+                  class="flex items-center space-x-1"
+                  x-show="formExpense.participants.includes(m)"
+                >
+
+                  <span
+                    class="text-[10px] text-slate-400"
+                    x-text="'指定 (' + formExpense.currency + '):'"
+                  ></span>
+
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="自動平分"
+                    x-model.number="formExpense.customShares[m]"
+                    class="w-20 text-right border rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+
                 </div>
+
               </div>
             </template>
+
           </div>
+
         </div>
+
       </div>
 
       <div class="flex justify-end gap-2 pt-2 border-t">
-        <button @click="showExpenseModal = false" class="px-4 py-2 text-xs font-medium text-slate-600">取消</button>
-        <button @click="saveExpense()" class="px-4 py-2 text-xs font-medium bg-indigo-600 text-white rounded-lg">儲存紀錄</button>
+
+        <button
+          @click="showExpenseModal = false"
+          class="px-4 py-2 text-xs font-medium text-slate-600"
+        >
+          取消
+        </button>
+
+        <button
+          @click="saveExpense()"
+          class="px-4 py-2 text-xs font-medium bg-indigo-600 text-white rounded-lg"
+        >
+          儲存紀錄
+        </button>
+
       </div>
+
     </div>
   </div>
 
-  <div x-show="toast.show" x-transition class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-4 py-2.5 rounded-full shadow-lg z-50">
+  <!-- 一般提示 -->
+  <div
+    x-show="toast.show"
+    x-transition
+    class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-4 py-2.5 rounded-full shadow-lg z-50"
+  >
     <span x-text="toast.message"></span>
   </div>
 
+  <!-- 刪除後復原提示 -->
+  <div
+    x-show="undoDelete.show"
+    x-transition
+    class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-4 py-2.5 rounded-full shadow-lg z-50 flex items-center gap-3"
+  >
+
+    <span>已刪除消費紀錄</span>
+
+    <button
+      @click="undoDeleteExpense()"
+      class="font-bold text-amber-300 hover:text-amber-200"
+    >
+      復原
+    </button>
+
+  </div>
+
   <script>
-    document.addEventListener('alpine:init', () => {
-      Alpine.data('expenseApp', () => ({
-        activeTab: 'expenses',
-        currencies: ['HKD', 'TWD', 'JPY', 'KRW', 'USD', 'EUR', 'THB'],
-        ratesToHKD: { HKD: 1.0, TWD: 0.24, JPY: 0.052, KRW: 0.0058, USD: 7.81, EUR: 8.45, THB: 0.22 },
+    document.addEventListener("alpine:init", () => {
+      Alpine.data("expenseApp", () => ({
+
+        activeTab: "expenses",
+
+        currencies: [
+          "HKD",
+          "TWD",
+          "JPY",
+          "KRW",
+          "USD",
+          "EUR",
+          "THB"
+        ],
+
+        ratesToHKD: {
+          HKD: 1.0,
+          TWD: 0.24,
+          JPY: 0.052,
+          KRW: 0.0058,
+          USD: 7.81,
+          EUR: 8.45,
+          THB: 0.22
+        },
 
         trip: {
-          name: '東京歡樂 5 日遊',
-          baseCurrency: 'HKD',
-          members: ['小明', '阿美', '小華', '老張'],
+          name: "東京歡樂 5 日遊",
+          baseCurrency: "HKD",
+          members: [
+            "小明",
+            "阿美",
+            "小華",
+            "老張"
+          ],
           expenses: []
         },
 
         showSyncModal: false,
-        importCodeInput: '',
+        importCodeInput: "",
 
         showTripModal: false,
-        tempTrip: { name: '', baseCurrency: 'HKD', members: [] },
-        newMemberName: '',
+
+        tempTrip: {
+          name: "",
+          baseCurrency: "HKD",
+          members: []
+        },
+
+        tempOriginalMembers: [],
+        newMemberName: "",
 
         showExpenseModal: false,
-        formExpense: { id: null, title: '', amount: '', currency: 'HKD', payer: '', category: '餐飲', participants: [], customShares: {} },
+
+        formExpense: {
+          id: null,
+          title: "",
+          amount: "",
+          currency: "HKD",
+          payer: "",
+          category: "餐飲",
+          participants: [],
+          customShares: {}
+        },
 
         receiptImage: null,
         receiptBase64: null,
         visionLoading: false,
 
-        aiPromptText: '',
+        aiPromptText: "",
         aiLoading: false,
-        toast: { show: false, message: '' },
+
+        toast: {
+          show: false,
+          message: ""
+        },
+
+        undoDelete: {
+          show: false,
+          expense: null,
+          index: -1,
+          timer: null
+        },
 
         init() {
-          const urlParams = new URLSearchParams(window.location.search);
-          const sharedData = urlParams.get('data');
+          const urlParams = new URLSearchParams(
+            window.location.search
+          );
+
+          const sharedData = urlParams.get("data");
+
           if (sharedData) {
             try {
-              const decoded = JSON.parse(decodeURIComponent(atob(sharedData)));
+              const decoded = JSON.parse(
+                decodeURIComponent(
+                  atob(sharedData)
+                )
+              );
+
               if (decoded && decoded.name) {
+                const previousTrip = JSON.parse(
+                  JSON.stringify(this.trip)
+                );
+
                 this.trip = decoded;
-                this.saveData();
-                this.showToast('已成功從分享連結載入最新行程資料！');
+
+                if (this.saveData()) {
+                  /*
+                   * 成功從分享網址匯入後，
+                   * 立即移除網址中的 data 參數。
+                   *
+                   * 這樣重新整理時便會讀取 localStorage
+                   * 內的最新帳目，而不會再次載入舊分享快照。
+                   */
+                  window.history.replaceState(
+                    {},
+                    document.title,
+                    window.location.pathname
+                  );
+
+                  this.showToast(
+                    "已成功從分享連結載入最新行程資料！"
+                  );
+                } else {
+                  this.trip = previousTrip;
+                }
               }
-            } catch (e) {
-              console.warn('URL import failed', e);
+            } catch (error) {
+              console.warn(
+                "URL import failed",
+                error
+              );
+
+              this.showToast(
+                "分享網址資料無法讀取"
+              );
             }
           } else {
             try {
-              const saved = localStorage.getItem('travel_expense_data');
+              const saved = localStorage.getItem(
+                "travel_expense_data"
+              );
+
               if (saved) {
                 const parsed = JSON.parse(saved);
-                if (parsed && parsed.name) this.trip = parsed;
+
+                if (parsed && parsed.name) {
+                  this.trip = parsed;
+                }
               }
-            } catch (e) {}
+            } catch (error) {
+              console.warn(
+                "Local data loading failed",
+                error
+              );
+
+              this.showToast(
+                "本機資料讀取失敗"
+              );
+            }
           }
 
-          if (!this.trip.expenses || this.trip.expenses.length === 0) {
-            this.trip.expenses = [
-              { id: '1', title: '築地市場早午餐', amount: 8000, currency: 'JPY', payer: '小明', category: '餐飲', participants: ['小明', '阿美', '小華', '老張'], customShares: {} },
-              { id: '2', title: '東京鐵塔門票', amount: 600, currency: 'HKD', payer: '阿美', category: '娛樂', participants: ['小明', '阿美', '小華'], customShares: { '小明': 300, '阿美': 150, '小華': 150 } }
-            ];
+          /*
+           * 不再於消費紀錄為空時加入示範帳目。
+           * 即使使用者刪除全部消費，重新整理後仍維持空白。
+           */
+          if (!Array.isArray(this.trip.expenses)) {
+            this.trip.expenses = [];
+          }
+
+          if (!Array.isArray(this.trip.members)) {
+            this.trip.members = [];
           }
         },
 
         saveData() {
-          try { localStorage.setItem('travel_expense_data', JSON.stringify(this.trip)); } catch (e) {}
+          try {
+            localStorage.setItem(
+              "travel_expense_data",
+              JSON.stringify(this.trip)
+            );
+
+            return true;
+          } catch (error) {
+            console.error(
+              "Save failed",
+              error
+            );
+
+            this.showToast(
+              "儲存失敗，請立即匯出備份並檢查瀏覽器儲存空間"
+            );
+
+            return false;
+          }
         },
 
-        showToast(msg) {
-          this.toast.message = msg;
+        showToast(message) {
+          this.toast.message = message;
           this.toast.show = true;
-          setTimeout(() => { this.toast.show = false; }, 2500);
+
+          setTimeout(() => {
+            this.toast.show = false;
+          }, 2500);
         },
 
-        formatNumber(val) {
-          return (Number(val) || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        formatNumber(value) {
+          return (Number(value) || 0).toLocaleString(
+            "en-US",
+            {
+              minimumFractionDigits: 1,
+              maximumFractionDigits: 1
+            }
+          );
         },
 
         convertToBase(amount, currency) {
-          const rateFrom = this.ratesToHKD[currency] || 1;
-          const rateBase = this.ratesToHKD[this.trip.baseCurrency] || 1;
-          return (amount * rateFrom) / rateBase;
+          const rateFrom =
+            this.ratesToHKD[currency] || 1;
+
+          const rateBase =
+            this.ratesToHKD[this.trip.baseCurrency] || 1;
+
+          return (
+            Number(amount) *
+            rateFrom
+          ) / rateBase;
         },
 
         calculateTotalTripBase() {
-          return this.trip.expenses.reduce((sum, exp) => sum + this.convertToBase(exp.amount, exp.currency), 0);
+          return this.trip.expenses.reduce(
+            (sum, expense) => {
+              return (
+                sum +
+                this.convertToBase(
+                  expense.amount,
+                  expense.currency
+                )
+              );
+            },
+            0
+          );
         },
 
-        getCategoryEmoji(cat) {
-          const map = { '餐飲': '🍱', '住宿': '🏨', '交通': '🚗', '購物': '🛍️', '娛樂': '🎟️', '其他': '💡' };
-          return map[cat] || '💡';
+        getCategoryEmoji(category) {
+          const map = {
+            餐飲: "🍱",
+            住宿: "🏨",
+            交通: "🚗",
+            購物: "🛍️",
+            娛樂: "🎟️",
+            其他: "💡"
+          };
+
+          return map[category] || "💡";
         },
 
-        hasCustomShares(exp) {
-          if (!exp.customShares) return false;
-          return Object.values(exp.customShares).some(v => v !== null && v !== '' && !isNaN(v) && Number(v) > 0);
+        hasCustomShares(expense) {
+          if (!expense.customShares) {
+            return false;
+          }
+
+          return Object
+            .values(expense.customShares)
+            .some((value) => {
+              return (
+                value !== null &&
+                value !== "" &&
+                !Number.isNaN(Number(value)) &&
+                Number(value) > 0
+              );
+            });
         },
 
         openSyncModal() {
-          this.importCodeInput = '';
+          this.importCodeInput = "";
           this.showSyncModal = true;
         },
 
         generateShareLink() {
           try {
-            const jsonStr = JSON.stringify(this.trip);
-            const encoded = btoa(encodeURIComponent(jsonStr));
-            const shareUrl = window.location.origin + window.location.pathname + '?data=' + encoded;
-            navigator.clipboard.writeText(shareUrl);
-            this.showToast('已複製同步網址！傳給朋友點開即可載入');
-          } catch (e) {
-            this.showToast('產生網址失敗，請嘗試複製代碼');
+            const jsonString = JSON.stringify(
+              this.trip
+            );
+
+            const encoded = btoa(
+              encodeURIComponent(jsonString)
+            );
+
+            const shareUrl =
+              window.location.origin +
+              window.location.pathname +
+              "?data=" +
+              encoded;
+
+            navigator.clipboard.writeText(
+              shareUrl
+            );
+
+            this.showToast(
+              "已複製同步網址！傳給朋友點開即可載入"
+            );
+          } catch (error) {
+            console.error(
+              "Share link generation failed",
+              error
+            );
+
+            this.showToast(
+              "產生網址失敗，請嘗試複製代碼"
+            );
           }
         },
 
         exportDataCode() {
           try {
-            const jsonStr = JSON.stringify(this.trip);
-            navigator.clipboard.writeText(jsonStr);
-            this.showToast('已複製資料代碼到剪貼簿！');
-          } catch (e) {
-            this.showToast('複製失敗');
+            const jsonString = JSON.stringify(
+              this.trip
+            );
+
+            navigator.clipboard.writeText(
+              jsonString
+            );
+
+            this.showToast(
+              "已複製資料代碼到剪貼簿！"
+            );
+          } catch (error) {
+            console.error(
+              "Copy failed",
+              error
+            );
+
+            this.showToast(
+              "複製失敗"
+            );
           }
         },
 
         importDataCode() {
-          if (!this.importCodeInput.trim()) return this.showToast('請先貼上資料代碼');
+          if (!this.importCodeInput.trim()) {
+            return this.showToast(
+              "請先貼上資料代碼"
+            );
+          }
+
           try {
-            const parsed = JSON.parse(this.importCodeInput.trim());
-            if (parsed && parsed.name && Array.isArray(parsed.members)) {
+            const parsed = JSON.parse(
+              this.importCodeInput.trim()
+            );
+
+            if (
+              parsed &&
+              parsed.name &&
+              Array.isArray(parsed.members)
+            ) {
+              const previousTrip = JSON.parse(
+                JSON.stringify(this.trip)
+              );
+
               this.trip = parsed;
-              this.saveData();
+
+              if (!Array.isArray(this.trip.expenses)) {
+                this.trip.expenses = [];
+              }
+
+              if (!this.saveData()) {
+                this.trip = previousTrip;
+                return;
+              }
+
               this.showSyncModal = false;
-              this.showToast('成功匯入並覆蓋資料！');
+
+              this.showToast(
+                "成功匯入並覆蓋資料！"
+              );
             } else {
-              this.showToast('資料格式不正確');
+              this.showToast(
+                "資料格式不正確"
+              );
             }
-          } catch (e) {
-            this.showToast('無效的代碼格式');
+          } catch (error) {
+            console.error(
+              "Import failed",
+              error
+            );
+
+            this.showToast(
+              "無效的代碼格式"
+            );
           }
         },
 
         get memberBalances() {
           const balances = {};
-          this.trip.members.forEach(m => balances[m] = 0);
 
-          this.trip.expenses.forEach(exp => {
-            const totalAmountBase = this.convertToBase(exp.amount, exp.currency);
-            const participants = exp.participants || [];
-            if (participants.length === 0) return;
+          this.trip.members.forEach((member) => {
+            balances[member] = 0;
+          });
 
-            const customShares = exp.customShares || {};
+          this.trip.expenses.forEach((expense) => {
+            const totalAmountBase =
+              this.convertToBase(
+                expense.amount,
+                expense.currency
+              );
+
+            const participants =
+              expense.participants || [];
+
+            if (participants.length === 0) {
+              return;
+            }
+
+            const customShares =
+              expense.customShares || {};
+
             let customSum = 0;
             let unassignedCount = 0;
 
-            participants.forEach(p => {
-              const val = Number(customShares[p]);
-              if (!isNaN(val) && val > 0) {
-                customSum += val;
-              } else {
-                unassignedCount++;
+            participants.forEach(
+              (participant) => {
+                const value = Number(
+                  customShares[participant]
+                );
+
+                if (
+                  !Number.isNaN(value) &&
+                  value > 0
+                ) {
+                  customSum += value;
+                } else {
+                  unassignedCount += 1;
+                }
               }
-            });
+            );
 
-            const remaining = Math.max(0, exp.amount - customSum);
-            const autoShare = unassignedCount > 0 ? remaining / unassignedCount : 0;
+            const remaining = Math.max(
+              0,
+              Number(expense.amount) - customSum
+            );
 
-            participants.forEach(p => {
-              const val = Number(customShares[p]);
-              const pShareCurr = (!isNaN(val) && val > 0) ? val : autoShare;
-              const pShareBase = this.convertToBase(pShareCurr, exp.currency);
+            const autoShare =
+              unassignedCount > 0
+                ? remaining / unassignedCount
+                : 0;
 
-              if (balances[p] !== undefined) {
-                balances[p] -= pShareBase;
+            participants.forEach(
+              (participant) => {
+                const value = Number(
+                  customShares[participant]
+                );
+
+                const participantShareCurrency =
+                  !Number.isNaN(value) &&
+                  value > 0
+                    ? value
+                    : autoShare;
+
+                const participantShareBase =
+                  this.convertToBase(
+                    participantShareCurrency,
+                    expense.currency
+                  );
+
+                if (
+                  balances[participant] !==
+                  undefined
+                ) {
+                  balances[participant] -=
+                    participantShareBase;
+                }
               }
-            });
+            );
 
-            if (balances[exp.payer] !== undefined) {
-              balances[exp.payer] += totalAmountBase;
+            if (
+              balances[expense.payer] !==
+              undefined
+            ) {
+              balances[expense.payer] +=
+                totalAmountBase;
             }
           });
 
-          return Object.keys(balances).map(name => ({ name, net: balances[name] }));
+          return Object
+            .keys(balances)
+            .map((name) => ({
+              name,
+              net: balances[name]
+            }));
         },
 
+        /*
+         * 使用回溯搜尋找出最少轉帳筆數。
+         *
+         * 計算前先把金額轉為整數「分」，
+         * 避免浮點數誤差令本來為零的餘額
+         * 變成很小的小數。
+         */
         get settlementPlan() {
-          const debtors = [];
-          const creditors = [];
-          this.memberBalances.forEach(m => {
-            if (m.net < -0.01) debtors.push({ name: m.name, amount: -m.net });
-            else if (m.net > 0.01) creditors.push({ name: m.name, amount: m.net });
-          });
+          const people = this.memberBalances
+            .map((member) => ({
+              name: member.name,
+              amount: Math.round(
+                member.net * 100
+              )
+            }))
+            .filter((member) => {
+              return member.amount !== 0;
+            });
 
-          const transactions = [];
-          let d = 0, c = 0;
-          while (d < debtors.length && c < creditors.length) {
-            const transfer = Math.min(debtors[d].amount, creditors[c].amount);
-            if (transfer > 0.01) {
-              transactions.push({ from: debtors[d].name, to: creditors[c].name, amount: transfer });
-            }
-            debtors[d].amount -= transfer;
-            creditors[c].amount -= transfer;
-            if (debtors[d].amount <= 0.01) d++;
-            if (creditors[c].amount <= 0.01) c++;
+          if (people.length === 0) {
+            return [];
           }
-          return transactions;
+
+          const names = people.map(
+            (person) => person.name
+          );
+
+          const initialBalances = people.map(
+            (person) => person.amount
+          );
+
+          /*
+           * 外幣換算及四捨五入後，
+           * 整數分總和偶爾可能相差一兩分。
+           * 將尾差加到絕對餘額最大的成員，
+           * 令總和重新回到零。
+           */
+          const roundingDifference =
+            initialBalances.reduce(
+              (sum, amount) => sum + amount,
+              0
+            );
+
+          if (roundingDifference !== 0) {
+            const adjustmentIndex =
+              initialBalances.reduce(
+                (
+                  largestIndex,
+                  amount,
+                  currentIndex,
+                  array
+                ) => {
+                  return (
+                    Math.abs(amount) >
+                    Math.abs(
+                      array[largestIndex]
+                    )
+                  )
+                    ? currentIndex
+                    : largestIndex;
+                },
+                0
+              );
+
+            initialBalances[
+              adjustmentIndex
+            ] -= roundingDifference;
+          }
+
+          const memo = new Map();
+
+          const solve = (balances) => {
+            const firstIndex =
+              balances.findIndex(
+                (amount) => amount !== 0
+              );
+
+            if (firstIndex === -1) {
+              return [];
+            }
+
+            const memoKey =
+              balances.join(",");
+
+            if (memo.has(memoKey)) {
+              return memo.get(memoKey);
+            }
+
+            let bestPlan = null;
+
+            const triedCounterpartyBalances =
+              new Set();
+
+            for (
+              let index = firstIndex + 1;
+              index < balances.length;
+              index += 1
+            ) {
+              /*
+               * 只配對一正一負的餘額。
+               */
+              if (
+                balances[firstIndex] *
+                  balances[index] >=
+                0
+              ) {
+                continue;
+              }
+
+              /*
+               * 若兩個候選人的餘額完全一樣，
+               * 它們在本次搜尋中的數學效果相同，
+               * 不需要重複搜尋。
+               */
+              if (
+                triedCounterpartyBalances.has(
+                  balances[index]
+                )
+              ) {
+                continue;
+              }
+
+              triedCounterpartyBalances.add(
+                balances[index]
+              );
+
+              const nextBalances = [
+                ...balances
+              ];
+
+              const transferAmount = Math.min(
+                Math.abs(
+                  nextBalances[firstIndex]
+                ),
+                Math.abs(
+                  nextBalances[index]
+                )
+              );
+
+              const transaction =
+                nextBalances[firstIndex] < 0
+                  ? {
+                      from: names[firstIndex],
+                      to: names[index],
+                      amount:
+                        transferAmount / 100
+                    }
+                  : {
+                      from: names[index],
+                      to: names[firstIndex],
+                      amount:
+                        transferAmount / 100
+                    };
+
+              nextBalances[firstIndex] +=
+                nextBalances[firstIndex] < 0
+                  ? transferAmount
+                  : -transferAmount;
+
+              nextBalances[index] +=
+                nextBalances[index] < 0
+                  ? transferAmount
+                  : -transferAmount;
+
+              const remainder = solve(
+                nextBalances
+              );
+
+              if (remainder !== null) {
+                const candidate = [
+                  transaction,
+                  ...remainder
+                ];
+
+                if (
+                  !bestPlan ||
+                  candidate.length <
+                    bestPlan.length
+                ) {
+                  bestPlan = candidate;
+                }
+              }
+
+              /*
+               * 若兩人的餘額剛好互相抵銷，
+               * 這通常是本層最理想配對，
+               * 不需要再測試其他相同層級方案。
+               */
+              if (
+                Math.abs(
+                  balances[firstIndex]
+                ) ===
+                Math.abs(
+                  balances[index]
+                )
+              ) {
+                break;
+              }
+            }
+
+            memo.set(
+              memoKey,
+              bestPlan
+            );
+
+            return bestPlan;
+          };
+
+          return solve(initialBalances) || [];
         },
 
-        openExpenseModal(exp = null) {
-          if (exp) {
-            this.formExpense = JSON.parse(JSON.stringify(exp));
-            if (!this.formExpense.customShares) this.formExpense.customShares = {};
+        openExpenseModal(expense = null) {
+          if (expense) {
+            this.formExpense = JSON.parse(
+              JSON.stringify(expense)
+            );
+
+            if (
+              !this.formExpense.customShares
+            ) {
+              this.formExpense.customShares = {};
+            }
           } else {
             this.formExpense = {
-              id: null, title: '', amount: '', currency: this.trip.baseCurrency,
-              payer: this.trip.members[0] || '', category: '餐飲',
-              participants: [...this.trip.members], customShares: {}
+              id: null,
+              title: "",
+              amount: "",
+              currency:
+                this.trip.baseCurrency,
+              payer:
+                this.trip.members[0] || "",
+              category: "餐飲",
+              participants: [
+                ...this.trip.members
+              ],
+              customShares: {}
             };
           }
+
           this.showExpenseModal = true;
         },
 
         saveExpense() {
-          if (!this.formExpense.title.trim() || !this.formExpense.amount || this.formExpense.amount <= 0) return this.showToast('請填寫有效名稱與金額');
-          if (this.formExpense.participants.length === 0) return this.showToast('請選擇參與拆帳成員');
-
-          const cleanedShares = {};
-          this.formExpense.participants.forEach(p => {
-            if (this.formExpense.customShares[p]) {
-              cleanedShares[p] = this.formExpense.customShares[p];
-            }
-          });
-          this.formExpense.customShares = cleanedShares;
-
-          if (this.formExpense.id) {
-            const idx = this.trip.expenses.findIndex(e => e.id === this.formExpense.id);
-            if (idx !== -1) this.trip.expenses[idx] = { ...this.formExpense };
-          } else {
-            this.formExpense.id = Date.now().toString();
-            this.trip.expenses.unshift({ ...this.formExpense });
+          if (
+            !this.formExpense.title.trim() ||
+            !this.formExpense.amount ||
+            this.formExpense.amount <= 0
+          ) {
+            return this.showToast(
+              "請填寫有效名稱與金額"
+            );
           }
 
-          this.saveData();
+          if (
+            this.formExpense.participants
+              .length === 0
+          ) {
+            return this.showToast(
+              "請選擇參與拆帳成員"
+            );
+          }
+
+          const cleanedShares = {};
+
+          this.formExpense.participants.forEach(
+            (participant) => {
+              if (
+                this.formExpense
+                  .customShares[participant]
+              ) {
+                cleanedShares[participant] =
+                  this.formExpense
+                    .customShares[participant];
+              }
+            }
+          );
+
+          this.formExpense.customShares =
+            cleanedShares;
+
+          const previousExpenses =
+            JSON.parse(
+              JSON.stringify(
+                this.trip.expenses
+              )
+            );
+
+          if (this.formExpense.id) {
+            const index =
+              this.trip.expenses.findIndex(
+                (expense) => {
+                  return (
+                    expense.id ===
+                    this.formExpense.id
+                  );
+                }
+              );
+
+            if (index !== -1) {
+              this.trip.expenses[index] = {
+                ...this.formExpense
+              };
+            }
+          } else {
+            const newExpense = {
+              ...this.formExpense,
+              id: Date.now().toString()
+            };
+
+            this.trip.expenses.unshift(
+              newExpense
+            );
+          }
+
+          /*
+           * 若儲存失敗，立即還原修改前的消費紀錄。
+           */
+          if (!this.saveData()) {
+            this.trip.expenses =
+              previousExpenses;
+
+            return;
+          }
+
           this.showExpenseModal = false;
-          this.showToast('消費紀錄已儲存');
+
+          this.showToast(
+            "消費紀錄已儲存"
+          );
         },
 
         deleteExpense(id) {
-          this.trip.expenses = this.trip.expenses.filter(e => e.id !== id);
-          this.saveData();
-          this.showToast('已刪除消費紀錄');
+          const index =
+            this.trip.expenses.findIndex(
+              (expense) => expense.id === id
+            );
+
+          if (index === -1) {
+            return;
+          }
+
+          const expense =
+            this.trip.expenses[index];
+
+          const confirmed =
+            window.confirm(
+              `確定刪除「${expense.title}」？刪除後可在 5 秒內復原。`
+            );
+
+          if (!confirmed) {
+            return;
+          }
+
+          const previousExpenses =
+            JSON.parse(
+              JSON.stringify(
+                this.trip.expenses
+              )
+            );
+
+          this.trip.expenses.splice(
+            index,
+            1
+          );
+
+          /*
+           * 刪除後先嘗試保存。
+           * 若保存失敗，立即還原整份紀錄。
+           */
+          if (!this.saveData()) {
+            this.trip.expenses =
+              previousExpenses;
+
+            return;
+          }
+
+          if (this.undoDelete.timer) {
+            clearTimeout(
+              this.undoDelete.timer
+            );
+          }
+
+          this.toast.show = false;
+
+          this.undoDelete = {
+            show: true,
+            expense,
+            index,
+            timer: null
+          };
+
+          this.undoDelete.timer =
+            setTimeout(() => {
+              this.undoDelete.show = false;
+              this.undoDelete.expense = null;
+              this.undoDelete.index = -1;
+              this.undoDelete.timer = null;
+            }, 5000);
         },
 
-        triggerPhotoScan() { document.getElementById('receiptInput').click(); },
+        undoDeleteExpense() {
+          if (!this.undoDelete.expense) {
+            return;
+          }
 
-        handleReceiptUpload(e) {
-          const file = e.target.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            this.receiptImage = evt.target.result;
-            this.receiptBase64 = evt.target.result.split(',')[1];
-            this.activeTab = 'ai';
-            this.showToast('相片已載入');
+          const restoreIndex = Math.min(
+            this.undoDelete.index,
+            this.trip.expenses.length
+          );
+
+          this.trip.expenses.splice(
+            restoreIndex,
+            0,
+            this.undoDelete.expense
+          );
+
+          /*
+           * 若復原後儲存失敗，
+           * 撤回本次復原，避免畫面和儲存資料不一致。
+           */
+          if (!this.saveData()) {
+            this.trip.expenses.splice(
+              restoreIndex,
+              1
+            );
+
+            return;
+          }
+
+          if (this.undoDelete.timer) {
+            clearTimeout(
+              this.undoDelete.timer
+            );
+          }
+
+          this.undoDelete = {
+            show: false,
+            expense: null,
+            index: -1,
+            timer: null
           };
+
+          this.showToast(
+            "已復原消費紀錄"
+          );
+        },
+
+        triggerPhotoScan() {
+          document
+            .getElementById("receiptInput")
+            .click();
+        },
+
+        handleReceiptUpload(event) {
+          const file =
+            event.target.files[0];
+
+          if (!file) {
+            return;
+          }
+
+          /*
+           * 收據圖片最大 10 MB。
+           */
+          const maxFileSize =
+            10 * 1024 * 1024;
+
+          if (file.size > maxFileSize) {
+            event.target.value = "";
+
+            return this.showToast(
+              "圖片太大，請選擇 10 MB 或以下的圖片"
+            );
+          }
+
+          const reader =
+            new FileReader();
+
+          reader.onload = (
+            loadEvent
+          ) => {
+            this.receiptImage =
+              loadEvent.target.result;
+
+            this.receiptBase64 =
+              loadEvent.target.result
+                .split(",")[1];
+
+            this.activeTab = "ai";
+
+            this.showToast(
+              "相片已載入"
+            );
+          };
+
+          reader.onerror = () => {
+            this.showToast(
+              "圖片讀取失敗，請重新選擇"
+            );
+          };
+
           reader.readAsDataURL(file);
         },
 
         analyzeReceiptWithAI() {
-          if (!this.receiptBase64) return this.showToast('請先拍攝或選擇照片');
+          if (!this.receiptBase64) {
+            return this.showToast(
+              "請先拍攝或選擇照片"
+            );
+          }
+
           this.visionLoading = true;
+
           setTimeout(() => {
             this.visionLoading = false;
+
             this.formExpense = {
-              id: null, title: '羅森便利商店 (掃描收據)', amount: 1480, currency: 'JPY',
-              payer: this.trip.members[0] || '', category: '餐飲',
-              participants: [...this.trip.members], customShares: {}
+              id: null,
+              title:
+                "羅森便利商店 (掃描收據)",
+              amount: 1480,
+              currency: "JPY",
+              payer:
+                this.trip.members[0] || "",
+              category: "餐飲",
+              participants: [
+                ...this.trip.members
+              ],
+              customShares: {}
             };
+
             this.showExpenseModal = true;
-            this.showToast('AI 圖片辨識完成！');
+
+            this.showToast(
+              "AI 圖片辨識完成！"
+            );
           }, 1200);
         },
 
         parseExpenseWithAI() {
-          if (!this.aiPromptText.trim()) return this.showToast('請輸入描述');
+          if (
+            !this.aiPromptText.trim()
+          ) {
+            return this.showToast(
+              "請輸入描述"
+            );
+          }
+
           this.aiLoading = true;
+
           setTimeout(() => {
             this.aiLoading = false;
+
             this.formExpense = {
-              id: null, title: '拉麵晚餐', amount: 12000, currency: 'JPY',
-              payer: '小明', category: '餐飲',
-              participants: this.trip.members.filter(m => m !== '阿美'), customShares: {}
+              id: null,
+              title: "拉麵晚餐",
+              amount: 12000,
+              currency: "JPY",
+              payer: "小明",
+              category: "餐飲",
+              participants:
+                this.trip.members.filter(
+                  (member) => {
+                    return member !== "阿美";
+                  }
+                ),
+              customShares: {}
             };
+
             this.showExpenseModal = true;
-            this.aiPromptText = '';
-            this.showToast('AI 已自動解析填寫！');
+            this.aiPromptText = "";
+
+            this.showToast(
+              "AI 已自動解析填寫！"
+            );
           }, 1200);
         },
 
         copySettlementReport() {
-          let text = `✈️ 【${this.trip.name}】拆帳結算報告\n---------------------------\n`;
-          text += `總金額：${this.trip.baseCurrency} $${this.formatNumber(this.calculateTotalTripBase())}\n\n轉帳建議方案：\n`;
-          if (this.settlementPlan.length === 0) {
-            text += `大家都算清囉！無須轉帳。`;
+          let text =
+            `✈️ 【${this.trip.name}】拆帳結算報告\n` +
+            `---------------------------\n`;
+
+          text +=
+            `總金額：${this.trip.baseCurrency} ` +
+            `$${this.formatNumber(
+              this.calculateTotalTripBase()
+            )}\n\n` +
+            `轉帳建議方案：\n`;
+
+          if (
+            this.settlementPlan.length === 0
+          ) {
+            text +=
+              "大家都算清囉！無須轉帳。";
           } else {
-            this.settlementPlan.forEach(p => { text += `👉 ${p.from} 轉給 ${p.to}：${this.trip.baseCurrency} $${this.formatNumber(p.amount)}\n`; });
+            this.settlementPlan.forEach(
+              (plan) => {
+                text +=
+                  `👉 ${plan.from} 轉給 ` +
+                  `${plan.to}：` +
+                  `${this.trip.baseCurrency} ` +
+                  `$${this.formatNumber(
+                    plan.amount
+                  )}\n`;
+              }
+            );
           }
-          navigator.clipboard.writeText(text).then(() => this.showToast('已複製結算文字！'));
+
+          navigator.clipboard
+            .writeText(text)
+            .then(() => {
+              this.showToast(
+                "已複製結算文字！"
+              );
+            });
         },
 
         openTripSettings() {
-          this.tempTrip = { name: this.trip.name, baseCurrency: this.trip.baseCurrency, members: [...this.trip.members] };
-          this.newMemberName = '';
+          this.tempTrip = {
+            name: this.trip.name,
+            baseCurrency:
+              this.trip.baseCurrency,
+            members: [
+              ...this.trip.members
+            ]
+          };
+
+          /*
+           * 保存每個輸入框原本對應的成員姓名。
+           * 即使使用者在輸入框改名，仍可知道
+           * 哪一位舊成員被改成甚麼名稱。
+           */
+          this.tempOriginalMembers = [
+            ...this.trip.members
+          ];
+
+          this.newMemberName = "";
           this.showTripModal = true;
         },
 
         addMemberToTemp() {
-          const name = this.newMemberName.trim();
-          if (name && !this.tempTrip.members.includes(name)) {
-            this.tempTrip.members.push(name);
-            this.newMemberName = '';
+          const name =
+            this.newMemberName.trim();
+
+          if (
+            name &&
+            !this.tempTrip.members.includes(
+              name
+            )
+          ) {
+            this.tempTrip.members.push(
+              name
+            );
+
+            /*
+             * 新增成員沒有舊名稱，
+             * 因此對應位置保存 null。
+             */
+            this.tempOriginalMembers.push(
+              null
+            );
+
+            this.newMemberName = "";
           }
         },
 
-        removeMemberFromTemp(idx) {
-          if (this.tempTrip.members.length <= 1) return this.showToast('至少需保留一位成員');
-          this.tempTrip.members.splice(idx, 1);
+        removeMemberFromTemp(index) {
+          if (
+            this.tempTrip.members.length <= 1
+          ) {
+            return this.showToast(
+              "至少需保留一位成員"
+            );
+          }
+
+          const originalName =
+            this.tempOriginalMembers[index];
+
+          /*
+           * 已經存在於任何舊帳目的成員，
+           * 不允許直接刪除。
+           *
+           * 這可避免舊帳目的付款人或參與者
+           * 從成員名單消失而令結算錯誤。
+           */
+          if (originalName) {
+            const isReferenced =
+              this.trip.expenses.some(
+                (expense) => {
+                  return (
+                    expense.payer ===
+                      originalName ||
+                    (
+                      expense.participants ||
+                      []
+                    ).includes(
+                      originalName
+                    ) ||
+                    Object.prototype
+                      .hasOwnProperty.call(
+                        expense.customShares ||
+                          {},
+                        originalName
+                      )
+                  );
+                }
+              );
+
+            if (isReferenced) {
+              return this.showToast(
+                `「${originalName}」已有消費紀錄，請保留成員或先處理相關帳目`
+              );
+            }
+          }
+
+          this.tempTrip.members.splice(
+            index,
+            1
+          );
+
+          this.tempOriginalMembers.splice(
+            index,
+            1
+          );
         },
 
         saveTripSettings() {
-          if (!this.tempTrip.name.trim()) return this.showToast('請輸入行程名稱');
-          this.trip.name = this.tempTrip.name;
-          this.trip.baseCurrency = this.tempTrip.baseCurrency;
-          this.trip.members = [...this.tempTrip.members];
-          this.saveData();
+          if (
+            !this.tempTrip.name.trim()
+          ) {
+            return this.showToast(
+              "請輸入行程名稱"
+            );
+          }
+
+          const cleanedMembers =
+            this.tempTrip.members.map(
+              (name) => name.trim()
+            );
+
+          if (
+            cleanedMembers.some(
+              (name) => !name
+            )
+          ) {
+            return this.showToast(
+              "成員姓名不可留空"
+            );
+          }
+
+          if (
+            new Set(cleanedMembers).size !==
+            cleanedMembers.length
+          ) {
+            return this.showToast(
+              "成員姓名不可重複"
+            );
+          }
+
+          /*
+           * 建立舊姓名 → 新姓名的改名表。
+           */
+          const renameMap = {};
+
+          this.tempOriginalMembers.forEach(
+            (
+              originalName,
+              index
+            ) => {
+              if (
+                originalName &&
+                originalName !==
+                  cleanedMembers[index]
+              ) {
+                renameMap[originalName] =
+                  cleanedMembers[index];
+              }
+            }
+          );
+
+          const previousTrip =
+            JSON.parse(
+              JSON.stringify(this.trip)
+            );
+
+          /*
+           * 成員改名時，同步修改所有舊帳目的：
+           *
+           * 1. 付款人；
+           * 2. 參與拆帳成員；
+           * 3. 指定金額的姓名鍵值。
+           */
+          this.trip.expenses =
+            this.trip.expenses.map(
+              (expense) => {
+                const renamedShares = {};
+
+                Object.entries(
+                  expense.customShares || {}
+                ).forEach(
+                  ([name, value]) => {
+                    renamedShares[
+                      renameMap[name] || name
+                    ] = value;
+                  }
+                );
+
+                return {
+                  ...expense,
+
+                  payer:
+                    renameMap[
+                      expense.payer
+                    ] ||
+                    expense.payer,
+
+                  participants:
+                    (
+                      expense.participants ||
+                      []
+                    ).map(
+                      (name) => {
+                        return (
+                          renameMap[name] ||
+                          name
+                        );
+                      }
+                    ),
+
+                  customShares:
+                    renamedShares
+                };
+              }
+            );
+
+          this.trip.name =
+            this.tempTrip.name.trim();
+
+          this.trip.baseCurrency =
+            this.tempTrip.baseCurrency;
+
+          this.trip.members =
+            cleanedMembers;
+
+          /*
+           * 儲存失敗時，還原整個行程資料。
+           */
+          if (!this.saveData()) {
+            this.trip =
+              previousTrip;
+
+            return;
+          }
+
           this.showTripModal = false;
-          this.showToast('行程設定已更新');
+
+          this.showToast(
+            "行程設定已更新"
+          );
         }
+
       }));
     });
   </script>
+
 </body>
 </html>
