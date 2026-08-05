@@ -25,10 +25,14 @@
           <p class="text-xs text-indigo-200" x-text="'本位幣：' + trip.baseCurrency + ' | 成員 ' + trip.members.length + ' 人'"></p>
         </div>
       </div>
-      <button @click="openTripSettings()" class="bg-indigo-500 hover:bg-indigo-700 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-        設定
-      </button>
+      <div class="flex items-center gap-1.5">
+        <button @click="openSyncModal()" class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
+          📲 同步/備份
+        </button>
+        <button @click="openTripSettings()" class="bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
+          ⚙️ 設定
+        </button>
+      </div>
     </div>
   </header>
 
@@ -58,6 +62,9 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           新增消費紀錄
         </button>
+        <button @click="triggerPhotoScan()" class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-4 py-2.5 rounded-xl shadow flex items-center gap-1 transition">
+          📷 掃描收據
+        </button>
       </div>
 
       <div class="space-y-2">
@@ -76,7 +83,7 @@
                 <div class="text-xs text-slate-500 mt-0.5">
                   <span class="text-indigo-600 font-medium" x-text="exp.payer"></span> 付款
                   <span class="text-slate-300">|</span>
-                  <span x-text="exp.participants.length + ' 人分攤'"></span>
+                  <span x-text="exp.participants.length + ' 人分攤' + (hasCustomShares(exp) ? ' (含指定金額)' : '')"></span>
                 </div>
               </div>
             </div>
@@ -139,29 +146,88 @@
     <!-- 頁籤 3: AI 智慧助手 -->
     <div x-show="activeTab === 'ai'" class="space-y-4">
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-        <h2 class="font-bold text-slate-800 text-base">🗣️ AI 快速語音/文字記帳</h2>
-        <textarea x-model="aiPromptText" rows="2" placeholder="輸入描述，例如：昨天小明幫大家付了拉麵 12000 日圓，阿美沒吃" class="w-full text-sm p-2.5 border rounded-lg outline-none"></textarea>
-        <button @click="parseExpenseWithAI()" :disabled="aiLoading" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm transition">
-          <span x-show="!aiLoading">AI 自動解析並填入表單</span>
-          <span x-show="aiLoading">AI 解析中...</span>
+        <h2 class="font-bold text-slate-800 text-base flex items-center gap-1.5">
+          📸 AI 拍照/收據自動辨識 (Vision)
+        </h2>
+        <p class="text-xs text-slate-500">上傳或拍攝單據，AI 自動萃取金額與細節。</p>
+        
+        <input type="file" id="receiptInput" accept="image/*" capture="environment" @change="handleReceiptUpload($event)" class="hidden">
+        
+        <div @click="triggerPhotoScan()" class="border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl p-4 text-center cursor-pointer bg-indigo-50/50 transition">
+          <template x-if="!receiptImage">
+            <div>
+              <div class="text-3xl mb-1">📷</div>
+              <div class="text-xs font-semibold text-indigo-600">點擊拍攝或選擇收據相片</div>
+            </div>
+          </template>
+          <template x-if="receiptImage">
+            <div class="space-y-2">
+              <img :src="receiptImage" class="max-h-40 mx-auto rounded-lg shadow-sm border">
+              <div class="text-xs text-indigo-600 font-medium">點擊更換照片</div>
+            </div>
+          </template>
+        </div>
+
+        <button @click="analyzeReceiptWithAI()" :disabled="!receiptImage || visionLoading" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 rounded-lg text-sm transition disabled:opacity-50">
+          <span x-show="!visionLoading">開始 AI 圖像辨識填單</span>
+          <span x-show="visionLoading">AI 辨識收據中...</span>
         </button>
       </div>
 
       <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-        <h2 class="font-bold text-slate-800 text-base">📊 AI 旅遊花費分析</h2>
-        <button @click="generateAIReport()" :disabled="aiReportLoading" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 rounded-lg text-sm transition">
-          <span x-show="!aiReportLoading">生成 AI 旅費分析報告</span>
-          <span x-show="aiReportLoading">生成報告中...</span>
+        <h2 class="font-bold text-slate-800 text-base flex items-center gap-1.5">
+          🗣️ AI 快速對話記帳
+        </h2>
+        <textarea x-model="aiPromptText" rows="2" placeholder="輸入描述，例如：昨天小明幫大家付了拉麵 12000 日圓，阿美沒吃" class="w-full text-sm p-2.5 border rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+        <button @click="parseExpenseWithAI()" :disabled="aiLoading" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm transition disabled:opacity-50">
+          <span x-show="!aiLoading">AI 解析文字填單</span>
+          <span x-show="aiLoading">AI 解析中...</span>
         </button>
-        <div x-show="aiReportResult" class="bg-purple-50 p-3.5 rounded-lg border border-purple-100 text-sm text-slate-700 space-y-2 whitespace-pre-wrap" x-text="aiReportResult"></div>
       </div>
     </div>
 
   </main>
 
-  <!-- 彈窗：行程設定 -->
-  <div x-show="showTripModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <!-- 彈窗 1：跨裝置同步與備份 -->
+  <div x-show="showSyncModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-slate-800 text-lg">📲 跨裝置資料同步 / 備份</h3>
+        <button @click="showSyncModal = false" class="text-slate-400">✕</button>
+      </div>
+
+      <div class="space-y-3 text-sm">
+        <p class="text-xs text-slate-500 leading-relaxed">
+          由於這是免費靜態網頁，資料預設儲存於本手機瀏覽器。如需切換瀏覽器或發給同行朋友同步，請使用下方功能：
+        </p>
+
+        <div class="space-y-2 pt-1">
+          <button @click="generateShareLink()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 transition">
+            🔗 複製一鍵同步網址 (發到 LINE 群組)
+          </button>
+          <button @click="exportDataCode()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg font-medium text-xs transition">
+            📋 複製資料文字代碼 (備份)
+          </button>
+        </div>
+
+        <div class="border-t pt-3">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">匯入其他裝置的資料</label>
+          <textarea x-model="importCodeInput" rows="3" placeholder="貼上從其他裝置複製的資料代碼..." class="w-full text-xs p-2 border rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+          <button @click="importDataCode()" class="w-full mt-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium text-xs transition">
+            📥 覆蓋並匯入資料
+          </button>
+        </div>
+      </div>
+
+      <div class="flex justify-end border-t pt-2">
+        <button @click="showSyncModal = false" class="px-4 py-1.5 text-xs font-medium text-slate-600">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 彈窗 2：行程設定 -->
+  <div x-show="showTripModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b pb-2">
         <h3 class="font-bold text-slate-800 text-lg">行程與成員設定</h3>
         <button @click="showTripModal = false" class="text-slate-400">✕</button>
@@ -184,7 +250,7 @@
 
         <div>
           <label class="block text-xs font-semibold text-slate-600 mb-1">旅行成員名單</label>
-          <div class="space-y-2 max-h-48 overflow-y-auto p-1">
+          <div class="space-y-2 max-h-36 overflow-y-auto p-1">
             <template x-for="(m, idx) in tempTrip.members" :key="idx">
               <div class="flex items-center space-x-2">
                 <input type="text" x-model="tempTrip.members[idx]" class="flex-1 text-sm border p-1.5 rounded-md">
@@ -206,7 +272,7 @@
     </div>
   </div>
 
-  <!-- 彈窗：新增/編輯消費 -->
+  <!-- 彈窗 3：新增/編輯消費 (新增指定金額功能) -->
   <div x-show="showExpenseModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b pb-2">
@@ -222,7 +288,7 @@
 
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">金額</label>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">總金額</label>
             <input type="number" step="any" x-model.number="formExpense.amount" placeholder="0.00" class="w-full border p-2 rounded-lg">
           </div>
           <div>
@@ -257,14 +323,26 @@
           </div>
         </div>
 
+        <!-- 拆帳分配區 -->
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">參與拆帳成員</label>
-          <div class="grid grid-cols-2 gap-2 border p-2 rounded-lg max-h-32 overflow-y-auto">
+          <div class="flex justify-between items-center mb-1">
+            <label class="text-xs font-semibold text-slate-600">參與拆帳成員與金額分配</label>
+            <span class="text-[10px] text-slate-400">未填金額者將自動平分剩餘數額</span>
+          </div>
+          <div class="space-y-2 border p-2.5 rounded-lg max-h-48 overflow-y-auto bg-slate-50/50">
             <template x-for="m in trip.members" :key="m">
-              <label class="flex items-center space-x-2 text-xs">
-                <input type="checkbox" :value="m" x-model="formExpense.participants" class="rounded text-indigo-600">
-                <span x-text="m"></span>
-              </label>
+              <div class="flex items-center justify-between gap-2 text-xs bg-white p-1.5 rounded border border-slate-100">
+                <label class="flex items-center space-x-2 cursor-pointer flex-1">
+                  <input type="checkbox" :value="m" x-model="formExpense.participants" class="rounded text-indigo-600">
+                  <span class="font-medium text-slate-700" x-text="m"></span>
+                </label>
+                <div class="flex items-center space-x-1" x-show="formExpense.participants.includes(m)">
+                  <span class="text-[10px] text-slate-400">指定:</span>
+                  <input type="number" step="any" placeholder="自動平分" 
+                         x-model.number="formExpense.customShares[m]" 
+                         class="w-20 text-right border rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500">
+                </div>
+              </div>
             </template>
           </div>
         </div>
@@ -295,32 +373,53 @@
           expenses: []
         },
 
+        showSyncModal: false,
+        importCodeInput: '',
+
         showTripModal: false,
         tempTrip: { name: '', baseCurrency: 'HKD', members: [] },
         newMemberName: '',
 
         showExpenseModal: false,
-        formExpense: { id: null, title: '', amount: '', currency: 'HKD', payer: '', category: '餐飲', participants: [] },
+        formExpense: { id: null, title: '', amount: '', currency: 'HKD', payer: '', category: '餐飲', participants: [], customShares: {} },
+
+        receiptImage: null,
+        receiptBase64: null,
+        visionLoading: false,
 
         aiPromptText: '',
         aiLoading: false,
-        aiReportLoading: false,
-        aiReportResult: '',
         toast: { show: false, message: '' },
 
         init() {
-          try {
-            const saved = localStorage.getItem('travel_expense_data');
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              if (parsed && parsed.name) this.trip = parsed;
+          // 檢查網址是否有分享數據參數
+          const urlParams = new URLSearchParams(window.location.search);
+          const sharedData = urlParams.get('data');
+          if (sharedData) {
+            try {
+              const decoded = JSON.parse(decodeURIComponent(atob(sharedData)));
+              if (decoded && decoded.name) {
+                this.trip = decoded;
+                this.saveData();
+                this.showToast('已成功從分享連結載入最新行程資料！');
+              }
+            } catch (e) {
+              console.warn('URL import failed', e);
             }
-          } catch (e) {}
+          } else {
+            try {
+              const saved = localStorage.getItem('travel_expense_data');
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && parsed.name) this.trip = parsed;
+              }
+            } catch (e) {}
+          }
 
           if (!this.trip.expenses || this.trip.expenses.length === 0) {
             this.trip.expenses = [
-              { id: '1', title: '築地市場早午餐', amount: 8000, currency: 'JPY', payer: '小明', category: '餐飲', participants: ['小明', '阿美', '小華', '老張'] },
-              { id: '2', title: '東京鐵塔門票', amount: 600, currency: 'HKD', payer: '阿美', category: '娛樂', participants: ['小明', '阿美', '小華'] }
+              { id: '1', title: '築地市場早午餐', amount: 8000, currency: 'JPY', payer: '小明', category: '餐飲', participants: ['小明', '阿美', '小華', '老張'], customShares: {} },
+              { id: '2', title: '東京鐵塔門票', amount: 600, currency: 'HKD', payer: '阿美', category: '娛樂', participants: ['小明', '阿美', '小華'], customShares: { '小明': 300, '阿美': 150, '小華': 150 } }
             ];
           }
         },
@@ -354,79 +453,97 @@
           return map[cat] || '💡';
         },
 
-        openTripSettings() {
-          this.tempTrip = { name: this.trip.name, baseCurrency: this.trip.baseCurrency, members: [...this.trip.members] };
-          this.newMemberName = '';
-          this.showTripModal = true;
+        hasCustomShares(exp) {
+          if (!exp.customShares) return false;
+          return Object.values(exp.customShares).some(v => v !== null && v !== '' && !isNaN(v) && Number(v) > 0);
         },
 
-        addMemberToTemp() {
-          const name = this.newMemberName.trim();
-          if (name && !this.tempTrip.members.includes(name)) {
-            this.tempTrip.members.push(name);
-            this.newMemberName = '';
+        // --- 同步與備份模組 ---
+        openSyncModal() {
+          this.importCodeInput = '';
+          this.showSyncModal = true;
+        },
+
+        generateShareLink() {
+          try {
+            const jsonStr = JSON.stringify(this.trip);
+            const encoded = btoa(encodeURIComponent(jsonStr));
+            const shareUrl = window.location.origin + window.location.pathname + '?data=' + encoded;
+            navigator.clipboard.writeText(shareUrl);
+            this.showToast('已複製同步網址！傳給朋友點開即可載入');
+          } catch (e) {
+            this.showToast('產生網址失敗，請嘗試複製代碼');
           }
         },
 
-        removeMemberFromTemp(idx) {
-          if (this.tempTrip.members.length <= 1) return this.showToast('至少需保留一位成員');
-          this.tempTrip.members.splice(idx, 1);
-        },
-
-        saveTripSettings() {
-          if (!this.tempTrip.name.trim()) return this.showToast('請輸入行程名稱');
-          this.trip.name = this.tempTrip.name;
-          this.trip.baseCurrency = this.tempTrip.baseCurrency;
-          this.trip.members = [...this.tempTrip.members];
-          this.saveData();
-          this.showTripModal = false;
-          this.showToast('行程設定已更新');
-        },
-
-        openExpenseModal(exp = null) {
-          if (exp) {
-            this.formExpense = JSON.parse(JSON.stringify(exp));
-          } else {
-            this.formExpense = {
-              id: null, title: '', amount: '', currency: this.trip.baseCurrency,
-              payer: this.trip.members[0] || '', category: '餐飲', participants: [...this.trip.members]
-            };
+        exportDataCode() {
+          try {
+            const jsonStr = JSON.stringify(this.trip);
+            navigator.clipboard.writeText(jsonStr);
+            this.showToast('已複製資料代碼到剪貼簿！');
+          } catch (e) {
+            this.showToast('複製失敗');
           }
-          this.showExpenseModal = true;
         },
 
-        saveExpense() {
-          if (!this.formExpense.title.trim() || !this.formExpense.amount || this.formExpense.amount <= 0) return this.showToast('請填寫有效名稱與金額');
-          if (this.formExpense.participants.length === 0) return this.showToast('請選擇參與拆帳成員');
-
-          if (this.formExpense.id) {
-            const idx = this.trip.expenses.findIndex(e => e.id === this.formExpense.id);
-            if (idx !== -1) this.trip.expenses[idx] = { ...this.formExpense };
-          } else {
-            this.formExpense.id = Date.now().toString();
-            this.trip.expenses.unshift({ ...this.formExpense });
+        importDataCode() {
+          if (!this.importCodeInput.trim()) return this.showToast('請先貼上資料代碼');
+          try {
+            const parsed = JSON.parse(this.importCodeInput.trim());
+            if (parsed && parsed.name && Array.isArray(parsed.members)) {
+              this.trip = parsed;
+              this.saveData();
+              this.showSyncModal = false;
+              this.showToast('成功匯入並覆蓋資料！');
+            } else {
+              this.showToast('資料格式不正確');
+            }
+          } catch (e) {
+            this.showToast('無效的代碼格式');
           }
-
-          this.saveData();
-          this.showExpenseModal = false;
-          this.showToast('消費紀錄已儲存');
         },
 
-        deleteExpense(id) {
-          this.trip.expenses = this.trip.expenses.filter(e => e.id !== id);
-          this.saveData();
-          this.showToast('已刪除消費紀錄');
-        },
-
+        // --- 消費與拆帳計算邏輯 (升級指定金額與剩餘平分) ---
         get memberBalances() {
           const balances = {};
           this.trip.members.forEach(m => balances[m] = 0);
 
           this.trip.expenses.forEach(exp => {
-            const amountBase = this.convertToBase(exp.amount, exp.currency);
-            if (balances[exp.payer] !== undefined) balances[exp.payer] += amountBase;
-            const share = exp.participants.length > 0 ? amountBase / exp.participants.length : 0;
-            exp.participants.forEach(p => { if (balances[p] !== undefined) balances[p] -= share; });
+            const totalAmountBase = this.convertToBase(exp.amount, exp.currency);
+            const participants = exp.participants || [];
+            if (participants.length === 0) return;
+
+            const customShares = exp.customShares || {};
+            let customSum = 0;
+            let unassignedCount = 0;
+
+            // 統計有指定金額與沒指定金額的人數
+            participants.forEach(p => {
+              const val = Number(customShares[p]);
+              if (!isNaN(val) && val > 0) {
+                customSum += val;
+              } else {
+                unassignedCount++;
+              }
+            });
+
+            // 計算剩餘未指定金額，平分給未填的人
+            const remaining = Math.max(0, exp.amount - customSum);
+            const autoShare = unassignedCount > 0 ? remaining / unassignedCount : 0;
+
+            participants.forEach(p => {
+              const val = Number(customShares[p]);
+              const pShareCurr = (!isNaN(val) && val > 0) ? val : autoShare;
+              const pShareBase = this.convertToBase(pShareCurr, exp.currency);
+
+              if (balances[p] !== undefined) {
+                balances[p] -= pShareBase;
+              }
+            });
+
+            if (balances[exp.payer] !== undefined) {
+              balances[exp.payer] += totalAmountBase;
+            }
           });
 
           return Object.keys(balances).map(name => ({ name, net: balances[name] }));
@@ -455,6 +572,98 @@
           return transactions;
         },
 
+        openExpenseModal(exp = null) {
+          if (exp) {
+            this.formExpense = JSON.parse(JSON.stringify(exp));
+            if (!this.formExpense.customShares) this.formExpense.customShares = {};
+          } else {
+            this.formExpense = {
+              id: null, title: '', amount: '', currency: this.trip.baseCurrency,
+              payer: this.trip.members[0] || '', category: '餐飲',
+              participants: [...this.trip.members], customShares: {}
+            };
+          }
+          this.showExpenseModal = true;
+        },
+
+        saveExpense() {
+          if (!this.formExpense.title.trim() || !this.formExpense.amount || this.formExpense.amount <= 0) return this.showToast('請填寫有效名稱與金額');
+          if (this.formExpense.participants.length === 0) return this.showToast('請選擇參與拆帳成員');
+
+          // 清理未選成員的 customShares
+          const cleanedShares = {};
+          this.formExpense.participants.forEach(p => {
+            if (this.formExpense.customShares[p]) {
+              cleanedShares[p] = this.formExpense.customShares[p];
+            }
+          });
+          this.formExpense.customShares = cleanedShares;
+
+          if (this.formExpense.id) {
+            const idx = this.trip.expenses.findIndex(e => e.id === this.formExpense.id);
+            if (idx !== -1) this.trip.expenses[idx] = { ...this.formExpense };
+          } else {
+            this.formExpense.id = Date.now().toString();
+            this.trip.expenses.unshift({ ...this.formExpense });
+          }
+
+          this.saveData();
+          this.showExpenseModal = false;
+          this.showToast('消費紀錄已儲存');
+        },
+
+        deleteExpense(id) {
+          this.trip.expenses = this.trip.expenses.filter(e => e.id !== id);
+          this.saveData();
+          this.showToast('已刪除消費紀錄');
+        },
+
+        triggerPhotoScan() { document.getElementById('receiptInput').click(); },
+
+        handleReceiptUpload(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            this.receiptImage = evt.target.result;
+            this.receiptBase64 = evt.target.result.split(',')[1];
+            this.activeTab = 'ai';
+            this.showToast('相片已載入');
+          };
+          reader.readAsDataURL(file);
+        },
+
+        analyzeReceiptWithAI() {
+          if (!this.receiptBase64) return this.showToast('請先拍攝或選擇照片');
+          this.visionLoading = true;
+          setTimeout(() => {
+            this.visionLoading = false;
+            this.formExpense = {
+              id: null, title: '羅森便利商店 (掃描收據)', amount: 1480, currency: 'JPY',
+              payer: this.trip.members[0] || '', category: '餐飲',
+              participants: [...this.trip.members], customShares: {}
+            };
+            this.showExpenseModal = true;
+            this.showToast('AI 圖片辨識完成！');
+          }, 1200);
+        },
+
+        parseExpenseWithAI() {
+          if (!this.aiPromptText.trim()) return this.showToast('請輸入描述');
+          this.aiLoading = true;
+          setTimeout(() => {
+            this.aiLoading = false;
+            this.formExpense = {
+              id: null, title: '拉麵晚餐', amount: 12000, currency: 'JPY',
+              payer: '小明', category: '餐飲',
+              participants: this.trip.members.filter(m => m !== '阿美'), customShares: {}
+            };
+            this.showExpenseModal = true;
+            this.aiPromptText = '';
+            this.showToast('AI 已自動解析填寫！');
+          }, 1200);
+        },
+
         copySettlementReport() {
           let text = `✈️ 【${this.trip.name}】拆帳結算報告\n---------------------------\n`;
           text += `總金額：${this.trip.baseCurrency} $${this.formatNumber(this.calculateTotalTripBase())}\n\n轉帳建議方案：\n`;
@@ -466,30 +675,33 @@
           navigator.clipboard.writeText(text).then(() => this.showToast('已複製結算文字！'));
         },
 
-        parseExpenseWithAI() {
-          if (!this.aiPromptText.trim()) return this.showToast('請輸入描述');
-          this.aiLoading = true;
-          setTimeout(() => {
-            this.aiLoading = false;
-            this.formExpense = {
-              id: null, title: '拉麵晚餐', amount: 12000, currency: 'JPY',
-              payer: '小明', category: '餐飲', participants: this.trip.members.filter(m => m !== '阿美')
-            };
-            this.showExpenseModal = true;
-            this.aiPromptText = '';
-            this.showToast('AI 已自動解析填寫！');
-          }, 1200);
+        openTripSettings() {
+          this.tempTrip = { name: this.trip.name, baseCurrency: this.trip.baseCurrency, members: [...this.trip.members] };
+          this.newMemberName = '';
+          this.showTripModal = true;
         },
 
-        generateAIReport() {
-          this.aiReportLoading = true;
-          setTimeout(() => {
-            this.aiReportLoading = false;
-            this.aiReportResult = `💡 【Gemini AI 旅費分析】\n` +
-              `• 團隊最高開支類別為「餐飲」，佔總消費約 60%。\n` +
-              `• 墊款之王 👑：【${this.trip.members[0]}】為大家墊付了最多款項。`;
-            this.showToast('AI 報告生成完畢！');
-          }, 1500);
+        addMemberToTemp() {
+          const name = this.newMemberName.trim();
+          if (name && !this.tempTrip.members.includes(name)) {
+            this.tempTrip.members.push(name);
+            this.newMemberName = '';
+          }
+        },
+
+        removeMemberFromTemp(idx) {
+          if (this.tempTrip.members.length <= 1) return this.showToast('至少需保留一位成員');
+          this.tempTrip.members.splice(idx, 1);
+        },
+
+        saveTripSettings() {
+          if (!this.tempTrip.name.trim()) return this.showToast('請輸入行程名稱');
+          this.trip.name = this.tempTrip.name;
+          this.trip.baseCurrency = this.tempTrip.baseCurrency;
+          this.trip.members = [...this.tempTrip.members];
+          this.saveData();
+          this.showTripModal = false;
+          this.showToast('行程設定已更新');
         }
       }));
     });
