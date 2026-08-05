@@ -76,9 +76,10 @@
       });
 
       // Firebase AI Logic：使用 Gemini Developer API。
-      const ai = getAI(firebaseApp, {
-        backend: new GoogleAIBackend()
-      });
+     const ai = getAI(firebaseApp, {
+  backend: new GoogleAIBackend(),
+  useLimitedUseAppCheckTokens: true
+}); 
 
       const auth = getAuth(firebaseApp);
 
